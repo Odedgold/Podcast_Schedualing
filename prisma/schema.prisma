@@ -40,6 +40,7 @@ model Participant {
   gender           String?
   hobbies          String?
   englishLevel     String?
+  hebrewLevel      String?
   podcastLanguage  String?
   competitionGoal  String?
   additionalInfo   String?
@@ -88,6 +89,7 @@ model Match {
   scheduledStartUtc  DateTime
   scheduledEndUtc    DateTime
   adminNotes         String?
+  systemNotes        String?
   approvedAt         DateTime?
   approvedBy         String?
   createdAt          DateTime    @default(now())

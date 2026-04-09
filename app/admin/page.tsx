@@ -59,6 +59,7 @@ interface Match {
   scheduledStartUtc: string
   scheduledEndUtc: string
   adminNotes?: string
+  systemNotes?: string
   members: MatchMember[]
 }
 
@@ -87,7 +88,12 @@ export default function AdminDashboard() {
   const [groupSize, setGroupSize] = useState(3)
   const [filterCountry, setFilterCountry] = useState('')
   const [filterSchool, setFilterSchool] = useState('')
-  const [matchResult, setMatchResult] = useState<{ matchesCreated: number } | null>(null)
+
+  // Country group state
+  const [countryGroupA, setCountryGroupA] = useState<string[]>([])
+  const [countryGroupRule, setCountryGroupRule] = useState<'any' | 'A_with_B' | 'A_with_A' | 'B_with_B'>('any')
+  const [matchResult, setMatchResult] = useState<{ matchesCreated: number; unmatchedCount: number; unmatched: { id: string; fullName: string; schoolName: string; country: string; warnings: string[] }[] } | null>(null)
+  const [editingNotes, setEditingNotes] = useState<Record<string, string>>({})
 
   type RuleMode = 'mandatory' | 'preferred' | 'off'
   const [rules, setRules] = useState<Record<string, RuleMode>>({
@@ -170,7 +176,7 @@ export default function AdminDashboard() {
     const res = await fetch('/api/admin/matches/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchType, groupSize, country: filterCountry || undefined, schoolName: filterSchool || undefined, rules }),
+      body: JSON.stringify({ matchType, groupSize, country: filterCountry || undefined, schoolName: filterSchool || undefined, rules, countryGroupA, countryGroupRule }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -189,6 +195,28 @@ export default function AdminDashboard() {
   async function rejectMatch(id: string) {
     await fetch(`/api/admin/matches/${id}/reject`, { method: 'POST' })
     fetchMatches()
+  }
+
+  async function breakMatch(id: string) {
+    if (!confirm('לפרק את השיבוץ ולהחזיר משתתפים לפול?')) return
+    await fetch(`/api/admin/matches/${id}/break`, { method: 'POST' })
+    fetchMatches()
+    fetchParticipants()
+  }
+
+  async function saveNotes(id: string) {
+    await fetch(`/api/admin/matches/${id}/notes`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminNotes: editingNotes[id] }),
+    })
+    fetchMatches()
+  }
+
+  function toggleCountryA(country: string) {
+    setCountryGroupA((prev) =>
+      prev.includes(country) ? prev.filter((c) => c !== country) : [...prev, country]
+    )
   }
 
   async function toggleField(id: string, isActive: boolean) {
@@ -586,6 +614,46 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Country Groups */}
+              {uniqueCountries.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-2">כללי שיבוץ לפי מדינה</label>
+                  <div className="border border-gray-200 rounded-lg p-3 space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">בחר מדינות לקבוצה A (למשל: ישראל)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {uniqueCountries.map((c) => (
+                          <button key={c} onClick={() => toggleCountryA(c)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${countryGroupA.includes(c) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {countryGroupA.length > 0 && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-2">כלל שיבוץ בין הקבוצות</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { value: 'A_with_B', label: 'A + B בלבד (ישראל עם חו"ל)' },
+                            { value: 'A_with_A', label: 'A + A בלבד' },
+                            { value: 'B_with_B', label: 'B + B בלבד' },
+                            { value: 'any', label: 'ללא הגבלה' },
+                          ].map((opt) => (
+                            <label key={opt.value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${countryGroupRule === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                              <input type="radio" name="groupRule" value={opt.value}
+                                checked={countryGroupRule === opt.value}
+                                onChange={(e) => setCountryGroupRule(e.target.value as typeof countryGroupRule)} />
+                              {opt.label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Matching Rules */}
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-3">Matching Rules</label>
@@ -635,8 +703,20 @@ export default function AdminDashboard() {
               </button>
 
               {matchResult && (
-                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
-                  ✓ Created <strong>{matchResult.matchesCreated}</strong> matches. Review them in the Matches tab.
+                <div className="space-y-2">
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
+                    ✓ נוצרו <strong>{matchResult.matchesCreated}</strong> שיבוצים. בדוק בטאב Matches Review.
+                  </div>
+                  {matchResult.unmatchedCount > 0 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
+                      ⚠️ <strong>{matchResult.unmatchedCount}</strong> משתתפים לא שובצו
+                      {matchResult.unmatched.map((u) => (
+                        <div key={u.id} className="mt-1 text-xs">
+                          • {u.fullName} ({u.schoolName}, {u.country}){u.warnings.length > 0 && ` — ${u.warnings.join(', ')}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -665,7 +745,7 @@ export default function AdminDashboard() {
                 <div className="space-y-3">
                   {draftMatches.map((match) => (
                     <div key={match.id} className="bg-white rounded-xl border border-gray-200 p-4">
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.matchType === 'PAIR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
@@ -677,24 +757,33 @@ export default function AdminDashboard() {
                           </div>
                           {match.members.map((mm) => (
                             <div key={mm.participant.id} className="text-sm text-gray-600">
-                              {mm.participant.fullName} — <span className="text-gray-400">{mm.participant.schoolName}</span>
+                              {mm.participant.fullName} — <span className="text-gray-400">{mm.participant.schoolName}, {mm.participant.country}</span>
                             </div>
                           ))}
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => approveMatch(match.id)}
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => rejectMatch(match.id)}
-                            className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg"
-                          >
-                            Reject
-                          </button>
+                        <div className="flex gap-2 shrink-0">
+                          <button onClick={() => approveMatch(match.id)} className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg">אשר</button>
+                          <button onClick={() => rejectMatch(match.id)} className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg">דחה</button>
+                          <button onClick={() => breakMatch(match.id)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg">פרק</button>
                         </div>
+                      </div>
+                      {/* System Notes */}
+                      {match.systemNotes && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-800 mb-2">
+                          ⚠️ {match.systemNotes.split(' | ').map((note, i) => (
+                            <span key={i} className="inline-block mr-2">• {note}</span>
+                          ))}
+                        </div>
+                      )}
+                      {/* Admin Notes */}
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          placeholder="הוסף הערה ידנית..."
+                          value={editingNotes[match.id] ?? match.adminNotes ?? ''}
+                          onChange={(e) => setEditingNotes((n) => ({ ...n, [match.id]: e.target.value }))}
+                        />
+                        <button onClick={() => saveNotes(match.id)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">שמור</button>
                       </div>
                     </div>
                   ))}

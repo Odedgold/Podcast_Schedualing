@@ -240,6 +240,8 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [tzSearch, setTzSearch] = useState('')
+  const [schoolList, setSchoolList] = useState<string[]>([])
+  const [schoolOther, setSchoolOther] = useState(false)
 
   const t = T[lang]
   const isRtl = lang === 'he'
@@ -268,6 +270,10 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   useEffect(() => {
     const detected = Intl.DateTimeFormat().resolvedOptions().timeZone
     setForm((f) => ({ ...f, detectedTz: detected, confirmedTz: detected }))
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/schools').then(r => r.json()).then((data: { name: string }[]) => setSchoolList(data.map(s => s.name))).catch(() => {})
   }, [])
 
   function validateStep1() {
@@ -429,11 +435,36 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                 {/* School */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.school} *</label>
-                  <input
-                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
-                    value={form.schoolName}
-                    onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
-                  />
+                  {schoolList.length > 0 ? (
+                    <>
+                      <select
+                        className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
+                        value={schoolOther ? '__other__' : form.schoolName}
+                        onChange={(e) => {
+                          if (e.target.value === '__other__') { setSchoolOther(true); setForm({ ...form, schoolName: '' }) }
+                          else { setSchoolOther(false); setForm({ ...form, schoolName: e.target.value }) }
+                        }}
+                      >
+                        <option value="">— Select school —</option>
+                        {schoolList.map((s) => <option key={s} value={s}>{s}</option>)}
+                        <option value="__other__">Other...</option>
+                      </select>
+                      {schoolOther && (
+                        <input
+                          className={`mt-2 w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
+                          placeholder="Enter school name"
+                          value={form.schoolName}
+                          onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
+                      value={form.schoolName}
+                      onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
+                    />
+                  )}
                   {errors.schoolName && <p className="text-red-500 text-xs mt-1">{errors.schoolName}</p>}
                 </div>
 

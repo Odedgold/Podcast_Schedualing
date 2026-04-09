@@ -3,6 +3,14 @@ generator client {
   output   = "../app/generated/prisma"
 }
 
+model School {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
 datasource db {
   provider = "postgresql"
 }

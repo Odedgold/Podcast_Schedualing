@@ -63,9 +63,11 @@ interface Match {
   members: MatchMember[]
 }
 
-const PARTICIPANT_COLORS = [
+const PALETTE = [
   '#3B82F6','#EF4444','#10B981','#F59E0B','#8B5CF6',
   '#EC4899','#06B6D4','#84CC16','#F97316','#6366F1',
+  '#14B8A6','#F43F5E','#A855F7','#FB923C','#22C55E',
+  '#EAB308','#0EA5E9','#E879F9','#4ADE80','#F87171',
 ]
 
 function utcToIst(utcIso: string) {
@@ -75,13 +77,19 @@ function utcToIst(utcIso: string) {
 }
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState<'participants' | 'fields' | 'matching' | 'matches'>('participants')
+  const [tab, setTab] = useState<'participants' | 'fields' | 'matching' | 'matches' | 'schools'>('participants')
   const [participants, setParticipants] = useState<Participant[]>([])
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table')
   const [tooltip, setTooltip] = useState<{ x: number; y: number; name: string } | null>(null)
+  // Calendar controls
+  const [colorMode, setColorMode] = useState<'individual' | 'school' | 'country'>('individual')
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  // Schools management
+  const [schools, setSchools] = useState<{ id: string; name: string; isActive: boolean; sortOrder: number }[]>([])
+  const [newSchoolName, setNewSchoolName] = useState('')
 
   // Matching state
   const [matchType, setMatchType] = useState<'PAIR' | 'GROUP' | 'BOTH'>('PAIR')
@@ -133,11 +141,17 @@ export default function AdminDashboard() {
     if (res.ok) setMatches(await res.json())
   }, [])
 
+  const fetchSchools = useCallback(async () => {
+    const res = await fetch('/api/admin/schools')
+    if (res.ok) setSchools(await res.json())
+  }, [])
+
   useEffect(() => {
     fetchParticipants()
     fetchCustomFields()
     fetchMatches()
-  }, [fetchParticipants, fetchCustomFields, fetchMatches])
+    fetchSchools()
+  }, [fetchParticipants, fetchCustomFields, fetchMatches, fetchSchools])
 
   function exportParticipantsToExcel() {
     const data = participants.map((p) => ({
@@ -255,6 +269,18 @@ export default function AdminDashboard() {
     window.location.href = '/admin/login'
   }
 
+  async function addSchool() {
+    if (!newSchoolName.trim()) return
+    await fetch('/api/admin/schools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSchoolName.trim() }) })
+    setNewSchoolName('')
+    fetchSchools()
+  }
+
+  async function deleteSchool(id: string) {
+    await fetch(`/api/admin/schools/${id}`, { method: 'DELETE' })
+    fetchSchools()
+  }
+
   const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   const timeSlots: string[] = []
@@ -263,9 +289,20 @@ export default function AdminDashboard() {
     timeSlots.push(`${String(h).padStart(2, '0')}:30`)
   }
 
-  function getSlotColor(participantId: string) {
-    const idx = participants.findIndex((p) => p.id === participantId)
-    return PARTICIPANT_COLORS[idx % PARTICIPANT_COLORS.length]
+  const uniqueSchoolsList = [...new Set(participants.map((p) => p.schoolName))].sort()
+  const uniqueCountriesList = [...new Set(participants.map((p) => p.country))].sort()
+
+  function getGroupColor(p: Participant): string {
+    if (colorMode === 'school') {
+      const idx = uniqueSchoolsList.indexOf(p.schoolName)
+      return PALETTE[idx % PALETTE.length]
+    }
+    if (colorMode === 'country') {
+      const idx = uniqueCountriesList.indexOf(p.country)
+      return PALETTE[idx % PALETTE.length]
+    }
+    const idx = participants.findIndex((pp) => pp.id === p.id)
+    return PALETTE[idx % PALETTE.length]
   }
 
   function isSlotOccupied(participantId: string, dayOfWeek: number, time: string) {
@@ -274,8 +311,19 @@ export default function AdminDashboard() {
     return p.availability.some((slot) => slot.dayOfWeek === dayOfWeek && slot.startTime === time)
   }
 
-  const uniqueCountries = [...new Set(participants.map((p) => p.country))].sort()
-  const uniqueSchools = [...new Set(participants.map((p) => p.schoolName))].sort()
+  function toggleGroup(ids: string[]) {
+    setHiddenIds((prev) => {
+      const next = new Set(prev)
+      const allHidden = ids.every((id) => next.has(id))
+      ids.forEach((id) => (allHidden ? next.delete(id) : next.add(id)))
+      return next
+    })
+  }
+
+  const visibleParticipants = participants.filter((p) => !hiddenIds.has(p.id))
+
+  const uniqueCountries = uniqueCountriesList
+  const uniqueSchools = uniqueSchoolsList
   const draftMatches = matches.filter((m) => m.status === 'DRAFT')
   const approvedMatches = matches.filter((m) => m.status === 'APPROVED')
 
@@ -297,7 +345,7 @@ export default function AdminDashboard() {
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200 px-6">
         <div className="flex gap-6">
-          {(['participants', 'fields', 'matching', 'matches'] as const).map((t) => (
+          {(['participants', 'fields', 'matching', 'matches', 'schools'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -305,7 +353,7 @@ export default function AdminDashboard() {
                 tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t === 'fields' ? 'Custom Fields' : t === 'matching' ? 'Matching Engine' : t === 'matches' ? 'Matches Review' : 'Participants'}
+              {t === 'fields' ? 'Custom Fields' : t === 'matching' ? 'Matching Engine' : t === 'matches' ? 'Matches Review' : t === 'schools' ? 'Schools' : 'Participants'}
             </button>
           ))}
         </div>
@@ -388,51 +436,123 @@ export default function AdminDashboard() {
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-auto relative">
-                {/* Legend */}
-                <div className="p-3 border-b border-gray-100 flex flex-wrap gap-3">
-                  {participants.map((p, i) => (
-                    <div key={p.id} className="flex items-center gap-1.5 text-xs text-gray-700">
-                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PARTICIPANT_COLORS[i % PARTICIPANT_COLORS.length] }} />
-                      {p.fullName || p.email}
-                    </div>
-                  ))}
+              <div className="space-y-3">
+                {/* Controls */}
+                <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 font-medium">Color by:</span>
+                    {(['individual', 'school', 'country'] as const).map((m) => (
+                      <button key={m} onClick={() => setColorMode(m)}
+                        className={`px-3 py-1 rounded-lg text-xs border transition-colors ${colorMode === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
+                        {m === 'individual' ? 'Individual' : m === 'school' ? 'School' : 'Country'}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setHiddenIds(new Set())} className="text-xs text-blue-600 hover:underline">Show all</button>
+                  <button onClick={() => setHiddenIds(new Set(participants.map(p => p.id)))} className="text-xs text-gray-500 hover:underline">Hide all</button>
                 </div>
-                <div className="overflow-x-auto">
+
+                {/* Legend with toggles */}
+                <div className="bg-white rounded-xl border border-gray-200 p-3">
+                  {colorMode === 'individual' && (
+                    <div className="flex flex-wrap gap-2">
+                      {participants.map((p) => {
+                        const hidden = hiddenIds.has(p.id)
+                        return (
+                          <button key={p.id} onClick={() => setHiddenIds(prev => { const n = new Set(prev); hidden ? n.delete(p.id) : n.add(p.id); return n })}
+                            className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border transition-opacity ${hidden ? 'opacity-40 border-gray-200' : 'border-gray-300'}`}>
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getGroupColor(p) }} />
+                            {p.fullName || p.email}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {colorMode === 'school' && (
+                    <div className="space-y-2">
+                      {uniqueSchoolsList.map((school, si) => {
+                        const schoolParticipants = participants.filter(p => p.schoolName === school)
+                        const allHidden = schoolParticipants.every(p => hiddenIds.has(p.id))
+                        return (
+                          <div key={school}>
+                            <button onClick={() => toggleGroup(schoolParticipants.map(p => p.id))}
+                              className={`flex items-center gap-2 text-xs font-semibold mb-1 px-2 py-0.5 rounded transition-opacity ${allHidden ? 'opacity-40' : ''}`}>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PALETTE[si % PALETTE.length] }} />
+                              {school} ({schoolParticipants.length})
+                            </button>
+                            <div className="flex flex-wrap gap-1.5 pl-5">
+                              {schoolParticipants.map(p => {
+                                const hidden = hiddenIds.has(p.id)
+                                return (
+                                  <button key={p.id} onClick={() => setHiddenIds(prev => { const n = new Set(prev); hidden ? n.delete(p.id) : n.add(p.id); return n })}
+                                    className={`text-xs px-2 py-0.5 rounded-full border transition-opacity ${hidden ? 'opacity-40 border-gray-200 text-gray-400' : 'border-gray-300 text-gray-700'}`}>
+                                    {p.fullName || p.email}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {colorMode === 'country' && (
+                    <div className="space-y-2">
+                      {uniqueCountriesList.map((country, ci) => {
+                        const countryParticipants = participants.filter(p => p.country === country)
+                        const allHidden = countryParticipants.every(p => hiddenIds.has(p.id))
+                        return (
+                          <div key={country}>
+                            <button onClick={() => toggleGroup(countryParticipants.map(p => p.id))}
+                              className={`flex items-center gap-2 text-xs font-semibold mb-1 px-2 py-0.5 rounded transition-opacity ${allHidden ? 'opacity-40' : ''}`}>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PALETTE[ci % PALETTE.length] }} />
+                              {country} ({countryParticipants.length})
+                            </button>
+                            <div className="flex flex-wrap gap-1.5 pl-5">
+                              {countryParticipants.map(p => {
+                                const hidden = hiddenIds.has(p.id)
+                                return (
+                                  <button key={p.id} onClick={() => setHiddenIds(prev => { const n = new Set(prev); hidden ? n.delete(p.id) : n.add(p.id); return n })}
+                                    className={`text-xs px-2 py-0.5 rounded-full border transition-opacity ${hidden ? 'opacity-40 border-gray-200 text-gray-400' : 'border-gray-300 text-gray-700'}`}>
+                                    {p.fullName || p.email}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Calendar grid */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-auto relative">
                   <div className="flex min-w-max">
-                    {/* Time labels */}
                     <div className="sticky left-0 bg-white z-10 border-r border-gray-100">
-                      <div className="h-12 border-b border-gray-100" />
+                      <div className="h-14 border-b border-gray-100" />
                       {timeSlots.map((t) => (
-                        <div key={t} className="h-7 flex items-center px-2 text-xs text-gray-400 w-14">
+                        <div key={t} className="h-10 flex items-center px-2 text-xs text-gray-400 w-16 border-b border-gray-50">
                           {t}
                         </div>
                       ))}
                     </div>
-                    {/* Day columns */}
                     {DAY_LABELS.map((dayLabel, dayIndex) => (
-                      <div key={dayIndex} className="border-r border-gray-100 min-w-[100px]">
-                        <div className="h-12 border-b border-gray-100 flex items-center justify-center px-2">
-                          <div className="text-xs font-medium text-gray-700">{dayLabel}</div>
+                      <div key={dayIndex} className="border-r border-gray-100 min-w-[140px]">
+                        <div className="h-14 border-b border-gray-100 flex items-center justify-center">
+                          <div className="text-sm font-semibold text-gray-700">{dayLabel}</div>
                         </div>
                         {timeSlots.map((time) => {
-                          const occupants = participants.filter((p) => isSlotOccupied(p.id, dayIndex, time))
+                          const occupants = visibleParticipants.filter((p) => isSlotOccupied(p.id, dayIndex, time))
                           return (
-                            <div
-                              key={time}
-                              className="h-7 border-b border-gray-50 relative flex"
-                              onMouseLeave={() => setTooltip(null)}
-                            >
+                            <div key={time} className="h-10 border-b border-gray-50 relative flex" onMouseLeave={() => setTooltip(null)}>
                               {occupants.map((p) => (
-                                <div
-                                  key={p.id}
-                                  className="flex-1 opacity-80"
-                                  style={{ backgroundColor: getSlotColor(p.id) }}
+                                <div key={p.id} className="flex-1 opacity-80"
+                                  style={{ backgroundColor: getGroupColor(p) }}
                                   onMouseEnter={(e) => {
                                     const rect = e.currentTarget.getBoundingClientRect()
                                     setTooltip({ x: rect.left, y: rect.top - 30, name: occupants.map(o => o.fullName || o.email).join(', ') })
                                   }}
-                                  title={p.fullName || p.email}
                                 />
                               ))}
                             </div>
@@ -442,11 +562,9 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 </div>
+
                 {tooltip && (
-                  <div
-                    className="fixed z-50 bg-gray-900 text-white text-xs px-2 py-1 rounded pointer-events-none"
-                    style={{ left: tooltip.x, top: tooltip.y }}
-                  >
+                  <div className="fixed z-50 bg-gray-900 text-white text-xs px-2 py-1 rounded pointer-events-none" style={{ left: tooltip.x, top: tooltip.y }}>
                     {tooltip.name}
                   </div>
                 )}
@@ -880,6 +998,39 @@ export default function AdminDashboard() {
                 No matches yet. Run the matching engine first.
               </div>
             )}
+          </div>
+        )}
+        {/* TAB 5: Schools */}
+        {tab === 'schools' && (
+          <div className="max-w-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">School List</h2>
+              <span className="text-sm text-gray-400">{schools.length} schools</span>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+              <p className="text-sm text-gray-600 mb-3">Schools appear as a dropdown in the registration form. Participants can also choose &quot;Other&quot;.</p>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="School name..."
+                  value={newSchoolName}
+                  onChange={(e) => setNewSchoolName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addSchool()}
+                />
+                <button onClick={addSchool} className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg">Add</button>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+              {schools.length === 0 && (
+                <p className="text-center text-gray-400 py-8 text-sm">No schools yet. Add some above.</p>
+              )}
+              {schools.map((school) => (
+                <div key={school.id} className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-sm text-gray-800">{school.name}</span>
+                  <button onClick={() => deleteSchool(school.id)} className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50">Remove</button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </main>

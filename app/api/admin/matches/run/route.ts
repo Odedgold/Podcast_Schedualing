@@ -96,7 +96,8 @@ function generateSystemNotes(
   b: ParticipantWithSlots,
   rules: Rules,
   groupA: string[],
-  groupRule: GroupRule
+  groupRule: GroupRule,
+  gradeGap: number
 ): string {
   const notes: string[] = []
 
@@ -144,7 +145,21 @@ function generateSystemNotes(
     notes.push(`מגדר שונה: ${a.gender} / ${b.gender}`)
   }
 
+  // Grade gap
+  if (a.grade && b.grade && rules.sameGrade !== 'off') {
+    const gap = Math.abs((parseInt(a.grade) || 0) - (parseInt(b.grade) || 0))
+    if (gap > 0) notes.push(`פער כיתות: ${a.grade} / ${b.grade}`)
+  }
+
   return notes.join(' | ')
+}
+
+function gradeWithinGap(a: string | null, b: string | null, gap: number): boolean {
+  if (!a || !b) return false
+  const na = parseInt(a, 10)
+  const nb = parseInt(b, 10)
+  if (isNaN(na) || isNaN(nb)) return a === b
+  return Math.abs(na - nb) <= gap
 }
 
 function scoreAndValidatePair(
@@ -152,7 +167,8 @@ function scoreAndValidatePair(
   b: ParticipantWithSlots,
   rules: Rules,
   groupA: string[],
-  groupRule: GroupRule
+  groupRule: GroupRule,
+  gradeGap: number
 ): { valid: boolean; score: number; overlap: ReturnType<typeof findAvailabilityOverlap> } {
   let score = 0
   let valid = true
@@ -188,9 +204,9 @@ function scoreAndValidatePair(
   if (rules.sameCompetitionGoal === 'mandatory' && !sameGoal) valid = false
   if (rules.sameCompetitionGoal === 'preferred' && sameGoal) score += 3
 
-  const sameGrade = a.grade && b.grade && a.grade === b.grade
-  if (rules.sameGrade === 'mandatory' && !sameGrade) valid = false
-  if (rules.sameGrade === 'preferred' && sameGrade) score += 2
+  const gradeOk = gradeWithinGap(a.grade, b.grade, gradeGap)
+  if (rules.sameGrade === 'mandatory' && !gradeOk) valid = false
+  if (rules.sameGrade === 'preferred' && gradeOk) score += 2
 
   const genderMatch = a.gender && b.gender && a.gender !== 'no_choice' && b.gender !== 'no_choice' && a.gender === b.gender
   if (rules.sameGender === 'mandatory' && !genderMatch) valid = false
@@ -210,6 +226,7 @@ export async function POST(request: NextRequest) {
       rules = {},
       countryGroupA = [],
       countryGroupRule = 'any',
+      gradeGap = 0,
     } = body
 
     const defaultRules: Rules = {
@@ -263,7 +280,7 @@ export async function POST(request: NextRequest) {
 
         for (let j = i + 1; j < eligible.length; j++) {
           if (matched.has(eligible[j].id)) continue
-          const { valid, score, overlap } = scoreAndValidatePair(eligible[i], eligible[j], defaultRules, countryGroupA, countryGroupRule as GroupRule)
+          const { valid, score, overlap } = scoreAndValidatePair(eligible[i], eligible[j], defaultRules, countryGroupA, countryGroupRule as GroupRule, gradeGap)
           if (valid && score > bestScore) {
             bestScore = score
             bestJ = j
@@ -275,7 +292,7 @@ export async function POST(request: NextRequest) {
           const overlap = bestOverlap || findAvailabilityOverlap(eligible[i].availability, eligible[i].confirmedTz, eligible[bestJ].availability, eligible[bestJ].confirmedTz)
           const startUtc = overlap ? nextOccurrence(overlap.dayOfWeek, overlap.startTime) : new Date()
           const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
-          const sysNotes = generateSystemNotes(eligible[i], eligible[bestJ], defaultRules, countryGroupA, countryGroupRule as GroupRule)
+          const sysNotes = generateSystemNotes(eligible[i], eligible[bestJ], defaultRules, countryGroupA, countryGroupRule as GroupRule, gradeGap)
 
           const match = await prisma.match.create({
             data: {

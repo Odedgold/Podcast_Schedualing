@@ -108,6 +108,7 @@ export default function AdminDashboard() {
     sameGrade: 'off',
     sameGender: 'off',
   })
+  const [gradeGap, setGradeGap] = useState<0 | 1 | 2>(0)
 
   function setRule(key: string, mode: RuleMode) {
     setRules((r) => ({ ...r, [key]: mode }))
@@ -178,7 +179,7 @@ export default function AdminDashboard() {
     const res = await fetch('/api/admin/matches/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchType, groupSize, country: filterCountry || undefined, schoolName: filterSchool || undefined, rules, countryGroupA, countryGroupRule }),
+      body: JSON.stringify({ matchType, groupSize, country: filterCountry || undefined, schoolName: filterSchool || undefined, rules, countryGroupA, countryGroupRule, gradeGap }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -674,7 +675,7 @@ export default function AdminDashboard() {
                     { key: 'similarHobbies', label: 'Similar hobbies', desc: 'At least one hobby in common' },
                     { key: 'samePodcastLanguage', label: 'Same podcast language preference', desc: 'Agree on recording language' },
                     { key: 'sameCompetitionGoal', label: 'Same competition goal', desc: 'Similar motivation (win/experience/etc.)' },
-                    { key: 'sameGrade', label: 'Same grade', desc: 'Same school grade/year' },
+                    { key: 'sameGrade', label: 'Same grade', desc: rules.sameGrade === 'off' ? 'Same school grade/year' : `Max gap: ${gradeGap === 0 ? 'exact' : `±${gradeGap}`}` },
                     { key: 'sameGender', label: 'Same gender', desc: 'Participants with the same gender (ignores "no preference")' },
                   ].map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center px-3 py-2.5 gap-4">
@@ -699,6 +700,20 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               </div>
+
+              {rules.sameGrade !== 'off' && (
+                <div className="border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Grade gap allowed</p>
+                  <div className="flex gap-2">
+                    {([0, 1, 2] as const).map((gap) => (
+                      <button key={gap} onClick={() => setGradeGap(gap)}
+                        className={`px-4 py-1.5 rounded-lg text-sm border transition-colors ${gradeGap === gap ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
+                        {gap === 0 ? 'Exact (±0)' : `±${gap} grade${gap > 1 ? 's' : ''}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <button onClick={runMatching} disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2.5 rounded-lg transition-colors">

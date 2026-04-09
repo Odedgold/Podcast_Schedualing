@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const participant = await prisma.participant.create({
       data: {
@@ -15,8 +15,8 @@ export async function POST(_request: NextRequest) {
       },
     })
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const url = `${baseUrl}/form/${participant.submissionToken}`
+    const origin = request.headers.get('origin') || `${request.nextUrl.protocol}//${request.nextUrl.host}`
+    const url = `${origin}/form/${participant.submissionToken}`
 
     return Response.json({ token: participant.submissionToken, url })
   } catch (error) {

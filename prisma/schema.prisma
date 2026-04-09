@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model CustomFieldDefinition {
+  id         String    @id @default(cuid())
+  label      String
+  fieldKey   String    @unique
+  fieldType  FieldType @default(TEXT)
+  options    String[]  @default([])
+  isRequired Boolean   @default(false)
+  isActive   Boolean   @default(true)
+  sortOrder  Int       @default(0)
+  createdAt  DateTime  @default(now())
+  responses  CustomFieldResponse[]
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  SELECT
+  MULTISELECT
+}
+
+model Participant {
+  id               String            @id @default(cuid())
+  submissionToken  String            @unique @default(cuid())
+  fullName         String
+  email            String
+  phone            String?
+  schoolName       String
+  city             String
+  country          String
+  grade            String?
+  hobbies          String?
+  englishLevel     String?
+  podcastLanguage  String?
+  competitionGoal  String?
+  additionalInfo   String?
+  detectedTz       String
+  confirmedTz      String
+  status           ParticipantStatus @default(PENDING)
+  submittedAt      DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  customFields     CustomFieldResponse[]
+  availability     AvailabilitySlot[]
+  matchMembers     MatchMember[]
+}
+
+enum ParticipantStatus {
+  PENDING
+  MATCHED
+  INACTIVE
+}
+
+model CustomFieldResponse {
+  id            String                @id @default(cuid())
+  participant   Participant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participantId String
+  field         CustomFieldDefinition @relation(fields: [fieldId], references: [id])
+  fieldId       String
+  value         String
+  @@unique([participantId, fieldId])
+}
+
+model AvailabilitySlot {
+  id            String      @id @default(cuid())
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participantId String
+  startUtc      DateTime
+  endUtc        DateTime
+  createdAt     DateTime    @default(now())
+  @@index([participantId])
+  @@index([startUtc, endUtc])
+}
+
+model Match {
+  id                 String      @id @default(cuid())
+  matchType          MatchType
+  status             MatchStatus @default(DRAFT)
+  scheduledStartUtc  DateTime
+  scheduledEndUtc    DateTime
+  adminNotes         String?
+  approvedAt         DateTime?
+  approvedBy         String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  members            MatchMember[]
+}
+
+enum MatchType {
+  PAIR
+  GROUP
+}
+
+enum MatchStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model MatchMember {
+  id            String      @id @default(cuid())
+  match         Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  matchId       String
+  participant   Participant @relation(fields: [participantId], references: [id])
+  participantId String
+  role          MemberRole  @default(PARTICIPANT)
+  @@unique([matchId, participantId])
+}
+
+enum MemberRole {
+  PARTICIPANT
+  FACILITATOR
+}

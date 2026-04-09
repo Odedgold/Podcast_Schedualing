@@ -7,12 +7,14 @@ type Rules = Record<string, RuleMode>
 type GroupRule = 'any' | 'A_with_B' | 'A_with_A' | 'B_with_B'
 
 interface WeeklySlot { dayOfWeek: number; startTime: string; endTime: string }
+interface UtcSlot { dayOfWeek: number; startMinutes: number; endMinutes: number }
 
 interface ParticipantWithSlots {
   id: string
   fullName: string
   schoolName: string
   country: string
+  confirmedTz: string
   englishLevel: string | null
   hobbies: string | null
   podcastLanguage: string | null
@@ -22,35 +24,45 @@ interface ParticipantWithSlots {
   availability: WeeklySlot[]
 }
 
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(':').map(Number)
-  return h * 60 + m
-}
-
 function minutesToTime(mins: number): string {
   return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
 }
 
-function nextOccurrence(dayOfWeek: number, timeStr: string): Date {
+// Convert a participant's local slot to UTC (day + minutes since midnight)
+function slotToUtc(slot: WeeklySlot, tz: string): UtcSlot {
+  // Use a fixed reference Sunday (2024-01-07) to compute the UTC equivalent
+  const [sh, sm] = slot.startTime.split(':').map(Number)
+  const [eh, em] = slot.endTime.split(':').map(Number)
+  const base = DateTime.fromObject({ year: 2024, month: 1, day: 7 + slot.dayOfWeek, hour: sh, minute: sm, second: 0 }, { zone: tz }).toUTC()
+  const baseEnd = DateTime.fromObject({ year: 2024, month: 1, day: 7 + slot.dayOfWeek, hour: eh, minute: em, second: 0 }, { zone: tz }).toUTC()
+  // Luxon weekday: 1=Mon … 7=Sun → JS: 0=Sun, 1=Mon … 6=Sat
+  const utcDay = base.weekday === 7 ? 0 : base.weekday
+  return { dayOfWeek: utcDay, startMinutes: base.hour * 60 + base.minute, endMinutes: baseEnd.hour * 60 + baseEnd.minute }
+}
+
+// nextOccurrence receives UTC day-of-week + UTC time string
+function nextOccurrence(utcDayOfWeek: number, utcTimeStr: string): Date {
   const jsToLuxon = [7, 1, 2, 3, 4, 5, 6]
-  const targetWeekday = jsToLuxon[dayOfWeek]
-  const [h, m] = timeStr.split(':').map(Number)
-  const now = DateTime.now()
+  const targetWeekday = jsToLuxon[utcDayOfWeek]
+  const [h, m] = utcTimeStr.split(':').map(Number)
+  const now = DateTime.utc()
   let d = now.set({ hour: h, minute: m, second: 0, millisecond: 0 })
   let attempts = 0
   while ((d.weekday !== targetWeekday || d <= now) && attempts < 14) {
     d = d.plus({ days: 1 })
     attempts++
   }
-  return d.toUTC().toJSDate()
+  return d.toJSDate()
 }
 
-function findAvailabilityOverlap(slotsA: WeeklySlot[], slotsB: WeeklySlot[]) {
-  for (const a of slotsA) {
-    for (const b of slotsB) {
+function findAvailabilityOverlap(slotsA: WeeklySlot[], tzA: string, slotsB: WeeklySlot[], tzB: string) {
+  const utcA = slotsA.map((s) => slotToUtc(s, tzA))
+  const utcB = slotsB.map((s) => slotToUtc(s, tzB))
+  for (const a of utcA) {
+    for (const b of utcB) {
       if (a.dayOfWeek !== b.dayOfWeek) continue
-      const overlapStart = Math.max(timeToMinutes(a.startTime), timeToMinutes(b.startTime))
-      const overlapEnd = Math.min(timeToMinutes(a.endTime), timeToMinutes(b.endTime))
+      const overlapStart = Math.max(a.startMinutes, b.startMinutes)
+      const overlapEnd = Math.min(a.endMinutes, b.endMinutes)
       if (overlapEnd - overlapStart >= 30) {
         return { dayOfWeek: a.dayOfWeek, startTime: minutesToTime(overlapStart), endTime: minutesToTime(overlapStart + 30) }
       }
@@ -148,7 +160,7 @@ function scoreAndValidatePair(
   // Country group rule (always mandatory)
   if (!countryGroupAllowed(a, b, groupA, groupRule)) return { valid: false, score: 0, overlap: null }
 
-  const overlap = findAvailabilityOverlap(a.availability, b.availability)
+  const overlap = findAvailabilityOverlap(a.availability, a.confirmedTz, b.availability, b.confirmedTz)
   if (rules.availability === 'mandatory' && !overlap) return { valid: false, score: 0, overlap: null }
   if (rules.availability === 'preferred' && overlap) score += 10
 
@@ -227,6 +239,7 @@ export async function POST(request: NextRequest) {
       fullName: p.fullName,
       schoolName: p.schoolName,
       country: p.country,
+      confirmedTz: p.confirmedTz,
       englishLevel: p.englishLevel,
       hobbies: p.hobbies,
       podcastLanguage: p.podcastLanguage,
@@ -259,7 +272,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (bestJ !== -1) {
-          const overlap = bestOverlap || findAvailabilityOverlap(eligible[i].availability, eligible[bestJ].availability)
+          const overlap = bestOverlap || findAvailabilityOverlap(eligible[i].availability, eligible[i].confirmedTz, eligible[bestJ].availability, eligible[bestJ].confirmedTz)
           const startUtc = overlap ? nextOccurrence(overlap.dayOfWeek, overlap.startTime) : new Date()
           const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
           const sysNotes = generateSystemNotes(eligible[i], eligible[bestJ], defaultRules, countryGroupA, countryGroupRule as GroupRule)
@@ -291,12 +304,15 @@ export async function POST(request: NextRequest) {
 
       for (let i = 0; i + size <= unmatched.length; i += size) {
         const group = unmatched.slice(i, i + size)
+        // Seed with first participant's first slot converted to UTC
         let commonOverlap: ReturnType<typeof findAvailabilityOverlap> = group[0].availability.length > 0
-          ? { dayOfWeek: group[0].availability[0].dayOfWeek, startTime: group[0].availability[0].startTime, endTime: group[0].availability[0].endTime }
+          ? (() => { const u = slotToUtc(group[0].availability[0], group[0].confirmedTz); return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) } })()
           : null
 
         for (let g = 1; g < group.length && commonOverlap; g++) {
-          commonOverlap = findAvailabilityOverlap([commonOverlap], group[g].availability)
+          // commonOverlap is already UTC; compare against g's slots converted to UTC
+          const utcSlotsG = group[g].availability.map((s) => { const u = slotToUtc(s, group[g].confirmedTz); return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) } })
+          commonOverlap = findAvailabilityOverlap([commonOverlap], 'UTC', utcSlotsG, 'UTC')
         }
 
         if (commonOverlap || defaultRules.availability !== 'mandatory') {

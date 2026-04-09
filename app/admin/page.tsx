@@ -94,6 +94,7 @@ export default function AdminDashboard() {
   const [countryGroupRule, setCountryGroupRule] = useState<'any' | 'A_with_B' | 'A_with_A' | 'B_with_B'>('any')
   const [matchResult, setMatchResult] = useState<{ matchesCreated: number; unmatchedCount: number; unmatched: { id: string; fullName: string; schoolName: string; country: string; warnings: string[] }[] } | null>(null)
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({})
+  const [expandedMatch, setExpandedMatch] = useState<string | null>(null)
 
   type RuleMode = 'mandatory' | 'preferred' | 'off'
   const [rules, setRules] = useState<Record<string, RuleMode>>({
@@ -743,50 +744,87 @@ export default function AdminDashboard() {
                   Draft ({draftMatches.length})
                 </h3>
                 <div className="space-y-3">
-                  {draftMatches.map((match) => (
-                    <div key={match.id} className="bg-white rounded-xl border border-gray-200 p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
+                  {draftMatches.map((match) => {
+                    const isExpanded = expandedMatch === match.id
+                    const members = match.members.map(mm => mm.participant)
+                    return (
+                      <div key={match.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        {/* Header row */}
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <button className="flex items-center gap-2 flex-1 text-left" onClick={() => setExpandedMatch(isExpanded ? null : match.id)}>
+                            <span className={`text-gray-400 text-xs transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.matchType === 'PAIR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                               {match.matchType}
                             </span>
                             <span className="text-sm font-medium text-gray-900">
-                              {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')} IST
+                              {members.map(m => m.fullName).join(' + ')}
                             </span>
+                            {match.systemNotes && <span className="text-yellow-500 text-xs">⚠️</span>}
+                          </button>
+                          <div className="flex gap-2 shrink-0">
+                            <button onClick={() => approveMatch(match.id)} className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg">אשר</button>
+                            <button onClick={() => rejectMatch(match.id)} className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg">דחה</button>
+                            <button onClick={() => breakMatch(match.id)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg">פרק</button>
                           </div>
-                          {match.members.map((mm) => (
-                            <div key={mm.participant.id} className="text-sm text-gray-600">
-                              {mm.participant.fullName} — <span className="text-gray-400">{mm.participant.schoolName}, {mm.participant.country}</span>
+                        </div>
+
+                        {/* Expanded details */}
+                        {isExpanded && (
+                          <div className="border-t border-gray-100 px-4 py-3 space-y-3 bg-gray-50">
+                            {/* Date & Time */}
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">תאריך ושעה</p>
+                              <p className="text-sm text-gray-800">
+                                {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')} (שעון ישראל)
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                          <button onClick={() => approveMatch(match.id)} className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg">אשר</button>
-                          <button onClick={() => rejectMatch(match.id)} className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg">דחה</button>
-                          <button onClick={() => breakMatch(match.id)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg">פרק</button>
-                        </div>
+
+                            {/* Participants details */}
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">משתתפים</p>
+                              <div className="grid grid-cols-1 gap-2">
+                                {members.map((m) => (
+                                  <div key={m.id} className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 space-y-0.5">
+                                    <div className="font-medium text-gray-900">{m.fullName}</div>
+                                    <div>{m.schoolName} · {m.country}</div>
+                                    {m.confirmedTz && <div className="text-gray-400">{m.confirmedTz}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* System Notes */}
+                            {match.systemNotes && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">הערות מערכת</p>
+                                <div className="space-y-1">
+                                  {match.systemNotes.split(' | ').map((note, i) => (
+                                    <div key={i} className="flex items-start gap-1.5 text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                                      <span>⚠️</span><span>{note}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Admin Notes */}
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">הערה ידנית</p>
+                              <div className="flex gap-2">
+                                <input
+                                  className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  placeholder="הוסף הערה..."
+                                  value={editingNotes[match.id] ?? match.adminNotes ?? ''}
+                                  onChange={(e) => setEditingNotes((n) => ({ ...n, [match.id]: e.target.value }))}
+                                />
+                                <button onClick={() => saveNotes(match.id)} className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">שמור</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {/* System Notes */}
-                      {match.systemNotes && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-800 mb-2">
-                          ⚠️ {match.systemNotes.split(' | ').map((note, i) => (
-                            <span key={i} className="inline-block mr-2">• {note}</span>
-                          ))}
-                        </div>
-                      )}
-                      {/* Admin Notes */}
-                      <div className="flex gap-2 mt-2">
-                        <input
-                          className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                          placeholder="הוסף הערה ידנית..."
-                          value={editingNotes[match.id] ?? match.adminNotes ?? ''}
-                          onChange={(e) => setEditingNotes((n) => ({ ...n, [match.id]: e.target.value }))}
-                        />
-                        <button onClick={() => saveNotes(match.id)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">שמור</button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

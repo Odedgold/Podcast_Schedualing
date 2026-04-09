@@ -32,6 +32,33 @@ const ENGLISH_LEVELS: Record<Lang, { value: string; label: string }[]> = {
   ],
 }
 
+const HEBREW_LEVELS: Record<Lang, { value: string; label: string }[]> = {
+  en: [
+    { value: 'none', label: 'No Hebrew' },
+    { value: 'beginner', label: 'Beginner' },
+    { value: 'elementary', label: 'Elementary' },
+    { value: 'intermediate', label: 'Intermediate' },
+    { value: 'advanced', label: 'Advanced' },
+    { value: 'native', label: 'Native' },
+  ],
+  he: [
+    { value: 'none', label: 'ללא עברית' },
+    { value: 'beginner', label: 'מתחיל/ה' },
+    { value: 'elementary', label: 'בסיסי/ת' },
+    { value: 'intermediate', label: 'בינוני/ת' },
+    { value: 'advanced', label: 'שולט/ת' },
+    { value: 'native', label: 'שפת אם' },
+  ],
+  es: [
+    { value: 'none', label: 'Sin hebreo' },
+    { value: 'beginner', label: 'Principiante' },
+    { value: 'elementary', label: 'Elemental' },
+    { value: 'intermediate', label: 'Intermedio' },
+    { value: 'advanced', label: 'Avanzado' },
+    { value: 'native', label: 'Nativo' },
+  ],
+}
+
 const PODCAST_LANGUAGE_OPTIONS: Record<Lang, { value: string; label: string }[]> = {
   en: [
     { value: 'english', label: 'I prefer to challenge myself in English' },
@@ -96,7 +123,9 @@ const T: Record<Lang, Record<string, string>> = {
     genderNoChoice: 'Prefer not to say',
     hobbies: 'Hobbies',
     englishLevel: 'English Level',
+    hebrewLevel: 'Hebrew Level',
     selectEnglishLevel: 'Select your level...',
+    selectHebrewLevel: 'Select your level...',
     timezone: 'Your Timezone',
     timezoneSearch: 'Search timezone...',
     priorityTz: 'Common Timezones',
@@ -135,7 +164,9 @@ const T: Record<Lang, Record<string, string>> = {
     genderNoChoice: 'מעדיפ/ה לא לציין',
     hobbies: 'תחביבים',
     englishLevel: 'רמת אנגלית',
+    hebrewLevel: 'רמת עברית',
     selectEnglishLevel: 'בחר/י רמה...',
+    selectHebrewLevel: 'בחר/י רמה...',
     timezone: 'אזור הזמן שלך',
     timezoneSearch: 'חפש אזור זמן...',
     priorityTz: 'אזורי זמן נפוצים',
@@ -174,7 +205,9 @@ const T: Record<Lang, Record<string, string>> = {
     genderNoChoice: 'Prefiero no decirlo',
     hobbies: 'Pasatiempos',
     englishLevel: 'Nivel de Inglés',
+    hebrewLevel: 'Nivel de Hebreo',
     selectEnglishLevel: 'Selecciona tu nivel...',
+    selectHebrewLevel: 'Selecciona tu nivel...',
     timezone: 'Tu Zona Horaria',
     timezoneSearch: 'Buscar zona horaria...',
     priorityTz: 'Zonas Horarias Comunes',
@@ -222,6 +255,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     gender: '',
     hobbies: '',
     englishLevel: '',
+    hebrewLevel: '',
     podcastLanguage: '',
     competitionGoal: '',
     additionalInfo: '',
@@ -443,20 +477,36 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                   />
                 </div>
 
-                {/* English Level */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.englishLevel}</label>
-                  <select
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                    value={form.englishLevel}
-                    onChange={(e) => setForm({ ...form, englishLevel: e.target.value })}
-                  >
-                    <option value="">{t.selectEnglishLevel}</option>
-                    {ENGLISH_LEVELS[lang].map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* English Level (Israel) / Hebrew Level (abroad) */}
+                {form.country.toLowerCase().includes('israel') || form.country === 'ישראל' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.englishLevel}</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      value={form.englishLevel}
+                      onChange={(e) => setForm({ ...form, englishLevel: e.target.value })}
+                    >
+                      <option value="">{t.selectEnglishLevel}</option>
+                      {ENGLISH_LEVELS[lang].map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : form.country ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.hebrewLevel}</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      value={form.hebrewLevel}
+                      onChange={(e) => setForm({ ...form, hebrewLevel: e.target.value })}
+                    >
+                      <option value="">{t.selectHebrewLevel}</option>
+                      {HEBREW_LEVELS[lang].map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-2 gap-3">
                   {/* City */}

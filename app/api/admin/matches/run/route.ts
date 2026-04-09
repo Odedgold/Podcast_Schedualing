@@ -2,6 +2,27 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { DateTime } from 'luxon'
 
+type RuleMode = 'mandatory' | 'preferred' | 'off'
+type Rules = Record<string, RuleMode>
+
+interface WeeklySlot {
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+}
+
+interface ParticipantWithSlots {
+  id: string
+  schoolName: string
+  country: string
+  englishLevel: string | null
+  hobbies: string | null
+  podcastLanguage: string | null
+  competitionGoal: string | null
+  grade: string | null
+  availability: WeeklySlot[]
+}
+
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(':').map(Number)
   return h * 60 + m
@@ -12,8 +33,6 @@ function minutesToTime(mins: number): string {
 }
 
 function nextOccurrence(dayOfWeek: number, timeStr: string): Date {
-  // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
-  // Luxon weekday: 1=Monday, ..., 7=Sunday
   const jsToLuxon = [7, 1, 2, 3, 4, 5, 6]
   const targetWeekday = jsToLuxon[dayOfWeek]
   const [h, m] = timeStr.split(':').map(Number)
@@ -27,13 +46,7 @@ function nextOccurrence(dayOfWeek: number, timeStr: string): Date {
   return d.toUTC().toJSDate()
 }
 
-interface WeeklySlot {
-  dayOfWeek: number
-  startTime: string
-  endTime: string
-}
-
-function findOverlap(slotsA: WeeklySlot[], slotsB: WeeklySlot[]) {
+function findAvailabilityOverlap(slotsA: WeeklySlot[], slotsB: WeeklySlot[]) {
   for (const a of slotsA) {
     for (const b of slotsB) {
       if (a.dayOfWeek !== b.dayOfWeek) continue
@@ -55,30 +68,79 @@ function findOverlap(slotsA: WeeklySlot[], slotsB: WeeklySlot[]) {
   return null
 }
 
-function findGroupOverlap(allSlots: WeeklySlot[][]) {
-  if (allSlots.length === 0) return null
-  for (const slot of allSlots[0]) {
-    let valid = true
-    for (let i = 1; i < allSlots.length; i++) {
-      const hasOverlap = allSlots[i].some((s) => {
-        if (s.dayOfWeek !== slot.dayOfWeek) return false
-        const aStart = timeToMinutes(slot.startTime)
-        const aEnd = timeToMinutes(slot.endTime)
-        const bStart = timeToMinutes(s.startTime)
-        const bEnd = timeToMinutes(s.endTime)
-        return Math.min(aEnd, bEnd) - Math.max(aStart, bStart) >= 30
-      })
-      if (!hasOverlap) { valid = false; break }
-    }
-    if (valid) return { dayOfWeek: slot.dayOfWeek, startTime: slot.startTime, endTime: slot.endTime }
-  }
-  return null
+function hobbiesOverlap(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false
+  const setA = new Set(a.toLowerCase().split(',').map((h) => h.trim()))
+  return b.toLowerCase().split(',').some((h) => setA.has(h.trim()))
+}
+
+function scoreAndValidatePair(
+  a: ParticipantWithSlots,
+  b: ParticipantWithSlots,
+  rules: Rules
+): { valid: boolean; score: number; overlap: ReturnType<typeof findAvailabilityOverlap> } {
+  let score = 0
+  let valid = true
+
+  // Check availability
+  const overlap = findAvailabilityOverlap(a.availability, b.availability)
+  if (rules.availability === 'mandatory' && !overlap) return { valid: false, score: 0, overlap: null }
+  if (rules.availability === 'preferred' && overlap) score += 10
+
+  // Different school
+  const diffSchool = a.schoolName !== b.schoolName
+  if (rules.differentSchool === 'mandatory' && !diffSchool) { valid = false }
+  if (rules.differentSchool === 'preferred' && diffSchool) score += 5
+
+  // Different country
+  const diffCountry = a.country !== b.country
+  if (rules.differentCountry === 'mandatory' && !diffCountry) { valid = false }
+  if (rules.differentCountry === 'preferred' && diffCountry) score += 5
+
+  // Same English level
+  const sameEnglish = a.englishLevel && b.englishLevel && a.englishLevel === b.englishLevel
+  if (rules.sameEnglishLevel === 'mandatory' && !sameEnglish) { valid = false }
+  if (rules.sameEnglishLevel === 'preferred' && sameEnglish) score += 4
+
+  // Similar hobbies
+  const hobbyMatch = hobbiesOverlap(a.hobbies, b.hobbies)
+  if (rules.similarHobbies === 'mandatory' && !hobbyMatch) { valid = false }
+  if (rules.similarHobbies === 'preferred' && hobbyMatch) score += 4
+
+  // Same podcast language
+  const sameLang = a.podcastLanguage && b.podcastLanguage && a.podcastLanguage === b.podcastLanguage
+  if (rules.samePodcastLanguage === 'mandatory' && !sameLang) { valid = false }
+  if (rules.samePodcastLanguage === 'preferred' && sameLang) score += 3
+
+  // Same competition goal
+  const sameGoal = a.competitionGoal && b.competitionGoal && a.competitionGoal === b.competitionGoal
+  if (rules.sameCompetitionGoal === 'mandatory' && !sameGoal) { valid = false }
+  if (rules.sameCompetitionGoal === 'preferred' && sameGoal) score += 3
+
+  // Same grade
+  const sameGrade = a.grade && b.grade && a.grade === b.grade
+  if (rules.sameGrade === 'mandatory' && !sameGrade) { valid = false }
+  if (rules.sameGrade === 'preferred' && sameGrade) score += 2
+
+  return { valid, score, overlap }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { matchType = 'PAIR', groupSize = 3, country, schoolName } = body
+    const { matchType = 'PAIR', groupSize = 3, country, schoolName, rules = {} } = body
+
+    const defaultRules: Rules = {
+      availability: 'mandatory',
+      differentSchool: 'off',
+      differentCountry: 'off',
+      sameEnglishLevel: 'off',
+      similarHobbies: 'off',
+      samePodcastLanguage: 'off',
+      sameCompetitionGoal: 'off',
+      sameGrade: 'off',
+      ...rules,
+    }
 
     const participantFilter: Record<string, unknown> = { status: 'PENDING' }
     if (country) participantFilter.country = country
@@ -91,67 +153,92 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const eligibleParticipants = participants.filter((p) => p.availability.length > 0)
+    const eligible: ParticipantWithSlots[] = participants.filter((p) => p.availability.length > 0).map((p) => ({
+      id: p.id,
+      schoolName: p.schoolName,
+      country: p.country,
+      englishLevel: p.englishLevel,
+      hobbies: p.hobbies,
+      podcastLanguage: p.podcastLanguage,
+      competitionGoal: p.competitionGoal,
+      grade: p.grade,
+      availability: p.availability,
+    }))
+
     const createdMatches: string[] = []
 
     if (matchType === 'PAIR' || matchType === 'BOTH') {
       const matched = new Set<string>()
 
-      for (let i = 0; i < eligibleParticipants.length; i++) {
-        if (matched.has(eligibleParticipants[i].id)) continue
+      for (let i = 0; i < eligible.length; i++) {
+        if (matched.has(eligible[i].id)) continue
 
-        for (let j = i + 1; j < eligibleParticipants.length; j++) {
-          if (matched.has(eligibleParticipants[j].id)) continue
+        // Find best candidate for eligible[i]
+        let bestScore = -1
+        let bestJ = -1
+        let bestOverlap: ReturnType<typeof findAvailabilityOverlap> = null
 
-          const overlap = findOverlap(
-            eligibleParticipants[i].availability,
-            eligibleParticipants[j].availability
-          )
-
-          if (overlap) {
-            const startUtc = nextOccurrence(overlap.dayOfWeek, overlap.startTime)
-            const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
-            const match = await prisma.match.create({
-              data: {
-                matchType: 'PAIR',
-                scheduledStartUtc: startUtc,
-                scheduledEndUtc: endUtc,
-                members: {
-                  create: [
-                    { participantId: eligibleParticipants[i].id },
-                    { participantId: eligibleParticipants[j].id },
-                  ],
-                },
-              },
-            })
-            createdMatches.push(match.id)
-            matched.add(eligibleParticipants[i].id)
-            matched.add(eligibleParticipants[j].id)
-            break
+        for (let j = i + 1; j < eligible.length; j++) {
+          if (matched.has(eligible[j].id)) continue
+          const { valid, score, overlap } = scoreAndValidatePair(eligible[i], eligible[j], defaultRules)
+          if (valid && score > bestScore) {
+            bestScore = score
+            bestJ = j
+            bestOverlap = overlap
           }
+        }
+
+        if (bestJ !== -1) {
+          const overlap = bestOverlap || findAvailabilityOverlap(eligible[i].availability, eligible[bestJ].availability)
+          const startUtc = overlap ? nextOccurrence(overlap.dayOfWeek, overlap.startTime) : new Date()
+          const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
+          const match = await prisma.match.create({
+            data: {
+              matchType: 'PAIR',
+              scheduledStartUtc: startUtc,
+              scheduledEndUtc: endUtc,
+              members: {
+                create: [
+                  { participantId: eligible[i].id },
+                  { participantId: eligible[bestJ].id },
+                ],
+              },
+            },
+          })
+          createdMatches.push(match.id)
+          matched.add(eligible[i].id)
+          matched.add(eligible[bestJ].id)
         }
       }
     }
 
     if (matchType === 'GROUP' || matchType === 'BOTH') {
       const size = groupSize || 3
-      const unmatched = eligibleParticipants.filter((p) => !createdMatches.includes(p.id))
+      const unmatched = eligible.filter((p) => !createdMatches.includes(p.id))
 
       for (let i = 0; i + size <= unmatched.length; i += size) {
         const group = unmatched.slice(i, i + size)
-        const commonSlot = findGroupOverlap(group.map((p) => p.availability))
+        // Find common availability
+        let commonOverlap: ReturnType<typeof findAvailabilityOverlap> = group[0].availability.length > 0
+          ? { dayOfWeek: group[0].availability[0].dayOfWeek, startTime: group[0].availability[0].startTime, endTime: group[0].availability[0].endTime }
+          : null
 
-        if (commonSlot) {
-          const startUtc = nextOccurrence(commonSlot.dayOfWeek, commonSlot.startTime)
+        for (let g = 1; g < group.length && commonOverlap; g++) {
+          commonOverlap = findAvailabilityOverlap(
+            [commonOverlap],
+            group[g].availability
+          )
+        }
+
+        if (commonOverlap || defaultRules.availability !== 'mandatory') {
+          const startUtc = commonOverlap ? nextOccurrence(commonOverlap.dayOfWeek, commonOverlap.startTime) : new Date()
           const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
           const match = await prisma.match.create({
             data: {
               matchType: 'GROUP',
               scheduledStartUtc: startUtc,
               scheduledEndUtc: endUtc,
-              members: {
-                create: group.map((p) => ({ participantId: p.id })),
-              },
+              members: { create: group.map((p) => ({ participantId: p.id })) },
             },
           })
           createdMatches.push(match.id)

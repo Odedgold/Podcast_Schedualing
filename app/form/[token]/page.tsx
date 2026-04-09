@@ -90,6 +90,10 @@ const T: Record<Lang, Record<string, string>> = {
     city: 'City',
     country: 'Country',
     grade: 'Grade',
+    gender: 'Gender',
+    genderMale: 'Male',
+    genderFemale: 'Female',
+    genderNoChoice: 'Prefer not to say',
     hobbies: 'Hobbies',
     englishLevel: 'English Level',
     selectEnglishLevel: 'Select your level...',
@@ -125,6 +129,10 @@ const T: Record<Lang, Record<string, string>> = {
     city: 'עיר',
     country: 'מדינה',
     grade: 'כיתה',
+    gender: 'מגדר',
+    genderMale: 'זכר',
+    genderFemale: 'נקבה',
+    genderNoChoice: 'מעדיפ/ה לא לציין',
     hobbies: 'תחביבים',
     englishLevel: 'רמת אנגלית',
     selectEnglishLevel: 'בחר/י רמה...',
@@ -160,6 +168,10 @@ const T: Record<Lang, Record<string, string>> = {
     city: 'Ciudad',
     country: 'País',
     grade: 'Grado',
+    gender: 'Género',
+    genderMale: 'Masculino',
+    genderFemale: 'Femenino',
+    genderNoChoice: 'Prefiero no decirlo',
     hobbies: 'Pasatiempos',
     englishLevel: 'Nivel de Inglés',
     selectEnglishLevel: 'Selecciona tu nivel...',
@@ -207,6 +219,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     city: '',
     country: '',
     grade: '',
+    gender: '',
     hobbies: '',
     englishLevel: '',
     podcastLanguage: '',
@@ -398,6 +411,26 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                     value={form.grade}
                     onChange={(e) => setForm({ ...form, grade: e.target.value })}
                   />
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.gender}</label>
+                  <div className="flex gap-3">
+                    {[
+                      { value: 'male', label: t.genderMale },
+                      { value: 'female', label: t.genderFemale },
+                      { value: 'no_choice', label: t.genderNoChoice },
+                    ].map((opt) => (
+                      <label key={opt.value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${form.gender === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                        <input type="radio" name="gender" value={opt.value}
+                          checked={form.gender === opt.value}
+                          onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                          className="accent-blue-600" />
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Hobbies */}

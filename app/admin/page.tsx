@@ -84,11 +84,26 @@ export default function AdminDashboard() {
 
   // Matching state
   const [matchType, setMatchType] = useState<'PAIR' | 'GROUP' | 'BOTH'>('PAIR')
-  const [daysAhead, setDaysAhead] = useState(14)
   const [groupSize, setGroupSize] = useState(3)
   const [filterCountry, setFilterCountry] = useState('')
   const [filterSchool, setFilterSchool] = useState('')
   const [matchResult, setMatchResult] = useState<{ matchesCreated: number } | null>(null)
+
+  type RuleMode = 'mandatory' | 'preferred' | 'off'
+  const [rules, setRules] = useState<Record<string, RuleMode>>({
+    availability: 'mandatory',
+    differentSchool: 'off',
+    differentCountry: 'off',
+    sameEnglishLevel: 'off',
+    similarHobbies: 'off',
+    samePodcastLanguage: 'off',
+    sameCompetitionGoal: 'off',
+    sameGrade: 'off',
+  })
+
+  function setRule(key: string, mode: RuleMode) {
+    setRules((r) => ({ ...r, [key]: mode }))
+  }
 
   // Custom field form
   const [showAddField, setShowAddField] = useState(false)
@@ -155,7 +170,7 @@ export default function AdminDashboard() {
     const res = await fetch('/api/admin/matches/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchType, daysAhead, groupSize, country: filterCountry || undefined, schoolName: filterSchool || undefined }),
+      body: JSON.stringify({ matchType, groupSize, country: filterCountry || undefined, schoolName: filterSchool || undefined, rules }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -521,84 +536,101 @@ export default function AdminDashboard() {
 
         {/* TAB 3: Matching Engine */}
         {tab === 'matching' && (
-          <div className="max-w-xl">
+          <div className="max-w-2xl">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Matching Engine</h2>
-            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-6">
+
+              {/* Match Type */}
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-2">Match Type</label>
                 <div className="flex gap-2">
                   {(['PAIR', 'GROUP', 'BOTH'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setMatchType(t)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${matchType === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}
-                    >
+                    <button key={t} onClick={() => setMatchType(t)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${matchType === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
                       {t}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-gray-700 block mb-2">
-                  Days Ahead: <span className="text-blue-600">{daysAhead}</span>
-                </label>
-                <input
-                  type="range" min={7} max={60} value={daysAhead}
-                  onChange={(e) => setDaysAhead(Number(e.target.value))}
-                  className="w-full accent-blue-600"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>7</span><span>60</span>
-                </div>
-              </div>
-
+              {/* Group Size */}
               {(matchType === 'GROUP' || matchType === 'BOTH') && (
                 <div>
                   <label className="text-sm font-medium text-gray-700 block mb-2">
                     Group Size: <span className="text-blue-600">{groupSize}</span>
                   </label>
-                  <input
-                    type="range" min={2} max={10} value={groupSize}
+                  <input type="range" min={2} max={10} value={groupSize}
                     onChange={(e) => setGroupSize(Number(e.target.value))}
-                    className="w-full accent-blue-600"
-                  />
-                  <div className="flex justify-between text-xs text-gray-400 mt-1">
-                    <span>2</span><span>10</span>
-                  </div>
+                    className="w-full accent-blue-600" />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1"><span>2</span><span>10</span></div>
                 </div>
               )}
 
+              {/* Filters */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-600 mb-1 block">Filter by Country</label>
-                  <select
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    value={filterCountry}
-                    onChange={(e) => setFilterCountry(e.target.value)}
-                  >
+                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
                     <option value="">All countries</option>
                     {uniqueCountries.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-gray-600 mb-1 block">Filter by School</label>
-                  <select
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    value={filterSchool}
-                    onChange={(e) => setFilterSchool(e.target.value)}
-                  >
+                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    value={filterSchool} onChange={(e) => setFilterSchool(e.target.value)}>
                     <option value="">All schools</option>
                     {uniqueSchools.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
 
-              <button
-                onClick={runMatching}
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2.5 rounded-lg transition-colors"
-              >
+              {/* Matching Rules */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-3">Matching Rules</label>
+                <div className="text-xs text-gray-400 flex gap-4 mb-2 px-1">
+                  <span className="w-48">Rule</span>
+                  <span className="w-24 text-center">Off</span>
+                  <span className="w-24 text-center text-yellow-600">Preferred</span>
+                  <span className="w-24 text-center text-red-600">Mandatory</span>
+                </div>
+                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {[
+                    { key: 'availability', label: 'Overlapping availability', desc: 'Must have a common free slot' },
+                    { key: 'differentSchool', label: 'Different schools', desc: 'Participants from different schools' },
+                    { key: 'differentCountry', label: 'Different countries', desc: 'Participants from different countries' },
+                    { key: 'sameEnglishLevel', label: 'Same English level', desc: 'Similar English proficiency' },
+                    { key: 'similarHobbies', label: 'Similar hobbies', desc: 'At least one hobby in common' },
+                    { key: 'samePodcastLanguage', label: 'Same podcast language preference', desc: 'Agree on recording language' },
+                    { key: 'sameCompetitionGoal', label: 'Same competition goal', desc: 'Similar motivation (win/experience/etc.)' },
+                    { key: 'sameGrade', label: 'Same grade', desc: 'Same school grade/year' },
+                  ].map(({ key, label, desc }) => (
+                    <div key={key} className="flex items-center px-3 py-2.5 gap-4">
+                      <div className="w-48">
+                        <div className="text-sm text-gray-800">{label}</div>
+                        <div className="text-xs text-gray-400">{desc}</div>
+                      </div>
+                      {(['off', 'preferred', 'mandatory'] as const).map((mode) => (
+                        <button key={mode}
+                          onClick={() => setRule(key, mode)}
+                          className={`w-24 py-1 rounded text-xs font-medium border transition-colors ${
+                            rules[key] === mode
+                              ? mode === 'mandatory' ? 'bg-red-500 text-white border-red-500'
+                              : mode === 'preferred' ? 'bg-yellow-400 text-white border-yellow-400'
+                              : 'bg-gray-200 text-gray-600 border-gray-200'
+                              : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'
+                          }`}>
+                          {mode === 'off' ? 'Off' : mode === 'preferred' ? 'Preferred' : 'Mandatory'}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={runMatching} disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2.5 rounded-lg transition-colors">
                 {loading ? 'Running...' : 'Run Matching'}
               </button>
 

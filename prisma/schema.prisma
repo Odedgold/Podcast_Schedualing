@@ -37,6 +37,7 @@ model Participant {
   city             String
   country          String
   grade            String?
+  gender           String?
   hobbies          String?
   englishLevel     String?
   podcastLanguage  String?

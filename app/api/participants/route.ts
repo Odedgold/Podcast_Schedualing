@@ -79,10 +79,11 @@ export async function POST(request: NextRequest) {
       await prisma.availabilitySlot.deleteMany({ where: { participantId: participant.id } })
       if (availability.length > 0) {
         await prisma.availabilitySlot.createMany({
-          data: availability.map((slot: { startUtc: string; endUtc: string }) => ({
+          data: availability.map((slot: { dayOfWeek: number; startTime: string; endTime: string }) => ({
             participantId: participant.id,
-            startUtc: new Date(slot.startUtc),
-            endUtc: new Date(slot.endUtc),
+            dayOfWeek: slot.dayOfWeek,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
           })),
         })
       }

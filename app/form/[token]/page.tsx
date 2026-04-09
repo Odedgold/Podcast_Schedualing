@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { DateTime } from 'luxon'
-import { PRIORITY_TIMEZONES, ALL_TIMEZONES, generateDaySlots, getNextDays } from '@/lib/timezone'
+import { PRIORITY_TIMEZONES, ALL_TIMEZONES } from '@/lib/timezone'
 
 type Lang = 'en' | 'he' | 'es'
 
@@ -70,6 +69,12 @@ const COMPETITION_GOAL_OPTIONS: Record<Lang, { value: string; label: string }[]>
     { value: 'experience', label: 'Participo por la experiencia' },
     { value: 'connect', label: 'Participo para conocer un nuevo amigo de la diáspora' },
   ],
+}
+
+const DAY_LABELS: Record<Lang, string[]> = {
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  he: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'],
+  es: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
 }
 
 const T: Record<Lang, Record<string, string>> = {
@@ -212,7 +217,6 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   })
 
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set())
-  const days = getNextDays(DAYS)
 
   useEffect(() => {
     const detected = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -257,15 +261,18 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   async function handleSubmit() {
     setSubmitting(true)
     try {
-      const availability: { startUtc: string; endUtc: string }[] = []
-      for (const day of days) {
-        const slots = generateDaySlots(day, form.confirmedTz)
-        for (const slot of slots) {
-          if (selectedSlots.has(slot.slotKey)) {
-            availability.push({ startUtc: slot.startUtc, endUtc: slot.endUtc })
-          }
-        }
-      }
+      const availability = Array.from(selectedSlots).map((key) => {
+        const [dayStr, timeStr] = key.split('_')
+        const dayOfWeek = parseInt(dayStr)
+        const h = timeStr.slice(0, 2)
+        const m = timeStr.slice(2, 4)
+        const startTime = `${h}:${m}`
+        const endMins = parseInt(m) + 30
+        const endTime = endMins === 60
+          ? `${String(parseInt(h) + 1).padStart(2, '0')}:00`
+          : `${h}:${String(endMins).padStart(2, '0')}`
+        return { dayOfWeek, startTime, endTime }
+      })
 
       const res = await fetch('/api/participants', {
         method: 'POST',
@@ -593,16 +600,12 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                   <div className="min-w-max">
                     {/* Header row */}
                     <div className="flex">
-                      <div className="w-16 shrink-0" />
-                      {days.map((day) => {
-                        const dt = DateTime.fromISO(day)
-                        return (
-                          <div key={day} className="w-16 text-center shrink-0">
-                            <div className="text-xs font-medium text-gray-700">{dt.toFormat('EEE')}</div>
-                            <div className="text-xs text-gray-400">{dt.toFormat('d/M')}</div>
-                          </div>
-                        )
-                      })}
+                      <div className="w-14 shrink-0" />
+                      {DAY_LABELS[lang].map((dayLabel, dayIndex) => (
+                        <div key={dayIndex} className="w-14 text-center shrink-0">
+                          <div className="text-xs font-medium text-gray-700 py-1">{dayLabel}</div>
+                        </div>
+                      ))}
                     </div>
 
                     {/* Time slots */}
@@ -616,16 +619,16 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                       }
                       return timeLabels.map((time) => (
                         <div key={time} className="flex">
-                          <div className="w-16 shrink-0 text-xs text-gray-400 flex items-center">{time}</div>
-                          {days.map((day) => {
+                          <div className="w-14 shrink-0 text-xs text-gray-400 flex items-center">{time}</div>
+                          {DAY_LABELS[lang].map((_, dayIndex) => {
                             const [h, m] = time.split(':').map(Number)
-                            const slotKey = `${day}_${String(h).padStart(2, '0')}${String(m).padStart(2, '0')}`
+                            const slotKey = `${dayIndex}_${String(h).padStart(2, '0')}${String(m).padStart(2, '0')}`
                             const selected = selectedSlots.has(slotKey)
                             return (
                               <div
-                                key={day}
+                                key={dayIndex}
                                 onClick={() => toggleSlot(slotKey)}
-                                className={`w-16 h-6 shrink-0 border border-gray-100 cursor-pointer transition-colors ${selected ? 'bg-blue-500' : 'bg-white hover:bg-blue-50'}`}
+                                className={`w-14 h-6 shrink-0 border border-gray-100 cursor-pointer transition-colors ${selected ? 'bg-blue-500' : 'bg-white hover:bg-blue-50'}`}
                               />
                             )
                           })}

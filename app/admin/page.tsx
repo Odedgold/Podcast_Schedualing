@@ -11,10 +11,9 @@ type ParticipantStatus = 'PENDING' | 'MATCHED' | 'INACTIVE'
 
 interface AvailabilitySlot {
   id: string
-  startUtc: string
-  endUtc: string
-  startIst: string
-  endIst: string
+  dayOfWeek: number
+  startTime: string
+  endTime: string
 }
 
 interface CustomFieldResponse {
@@ -210,12 +209,7 @@ export default function AdminDashboard() {
     window.location.href = '/admin/login'
   }
 
-  // Calendar view data
-  const calendarDays: string[] = []
-  const today = DateTime.now().startOf('day')
-  for (let i = 0; i < 14; i++) {
-    calendarDays.push(today.plus({ days: i }).toFormat('yyyy-MM-dd'))
-  }
+  const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   const timeSlots: string[] = []
   for (let h = 6; h < 23; h++) {
@@ -228,17 +222,10 @@ export default function AdminDashboard() {
     return PARTICIPANT_COLORS[idx % PARTICIPANT_COLORS.length]
   }
 
-  function isSlotOccupied(participantId: string, day: string, time: string) {
+  function isSlotOccupied(participantId: string, dayOfWeek: number, time: string) {
     const p = participants.find((pp) => pp.id === participantId)
     if (!p) return false
-    const [h, m] = time.split(':').map(Number)
-    return p.availability.some((slot) => {
-      const slotStart = DateTime.fromISO(slot.startUtc, { zone: 'utc' }).setZone('Asia/Jerusalem')
-      const slotDate = slotStart.toFormat('yyyy-MM-dd')
-      const slotHour = slotStart.hour
-      const slotMin = slotStart.minute
-      return slotDate === day && slotHour === h && slotMin === m
-    })
+    return p.availability.some((slot) => slot.dayOfWeek === dayOfWeek && slot.startTime === time)
   }
 
   const uniqueCountries = [...new Set(participants.map((p) => p.country))].sort()
@@ -377,40 +364,36 @@ export default function AdminDashboard() {
                       ))}
                     </div>
                     {/* Day columns */}
-                    {calendarDays.map((day) => {
-                      const dt = DateTime.fromISO(day)
-                      return (
-                        <div key={day} className="border-r border-gray-100 min-w-[100px]">
-                          <div className="h-12 border-b border-gray-100 flex flex-col items-center justify-center px-2">
-                            <div className="text-xs font-medium text-gray-700">{dt.toFormat('EEE')}</div>
-                            <div className="text-xs text-gray-400">{dt.toFormat('d MMM')}</div>
-                          </div>
-                          {timeSlots.map((time) => {
-                            const occupants = participants.filter((p) => isSlotOccupied(p.id, day, time))
-                            return (
-                              <div
-                                key={time}
-                                className="h-7 border-b border-gray-50 relative flex"
-                                onMouseLeave={() => setTooltip(null)}
-                              >
-                                {occupants.map((p, i) => (
-                                  <div
-                                    key={p.id}
-                                    className="flex-1 opacity-80"
-                                    style={{ backgroundColor: getSlotColor(p.id) }}
-                                    onMouseEnter={(e) => {
-                                      const rect = e.currentTarget.getBoundingClientRect()
-                                      setTooltip({ x: rect.left, y: rect.top - 30, name: occupants.map(o => o.fullName || o.email).join(', ') })
-                                    }}
-                                    title={p.fullName || p.email}
-                                  />
-                                ))}
-                              </div>
-                            )
-                          })}
+                    {DAY_LABELS.map((dayLabel, dayIndex) => (
+                      <div key={dayIndex} className="border-r border-gray-100 min-w-[100px]">
+                        <div className="h-12 border-b border-gray-100 flex items-center justify-center px-2">
+                          <div className="text-xs font-medium text-gray-700">{dayLabel}</div>
                         </div>
-                      )
-                    })}
+                        {timeSlots.map((time) => {
+                          const occupants = participants.filter((p) => isSlotOccupied(p.id, dayIndex, time))
+                          return (
+                            <div
+                              key={time}
+                              className="h-7 border-b border-gray-50 relative flex"
+                              onMouseLeave={() => setTooltip(null)}
+                            >
+                              {occupants.map((p) => (
+                                <div
+                                  key={p.id}
+                                  className="flex-1 opacity-80"
+                                  style={{ backgroundColor: getSlotColor(p.id) }}
+                                  onMouseEnter={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    setTooltip({ x: rect.left, y: rect.top - 30, name: occupants.map(o => o.fullName || o.email).join(', ') })
+                                  }}
+                                  title={p.fullName || p.email}
+                                />
+                              ))}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
                   </div>
                 </div>
                 {tooltip && (

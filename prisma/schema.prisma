@@ -72,11 +72,12 @@ model AvailabilitySlot {
   id            String      @id @default(cuid())
   participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
   participantId String
-  startUtc      DateTime
-  endUtc        DateTime
+  dayOfWeek     Int         // 0=Sunday, 1=Monday, ..., 6=Saturday
+  startTime     String      // "HH:MM"
+  endTime       String      // "HH:MM"
   createdAt     DateTime    @default(now())
+  @@unique([participantId, dayOfWeek, startTime])
   @@index([participantId])
-  @@index([startUtc, endUtc])
 }
 
 model Match {

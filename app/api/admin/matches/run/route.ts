@@ -180,6 +180,10 @@ function scoreAndValidatePair(
   if (rules.sameGrade === 'mandatory' && !sameGrade) valid = false
   if (rules.sameGrade === 'preferred' && sameGrade) score += 2
 
+  const genderMatch = a.gender && b.gender && a.gender !== 'no_choice' && b.gender !== 'no_choice' && a.gender === b.gender
+  if (rules.sameGender === 'mandatory' && !genderMatch) valid = false
+  if (rules.sameGender === 'preferred' && genderMatch) score += 3
+
   return { valid, score, overlap }
 }
 
@@ -205,6 +209,7 @@ export async function POST(request: NextRequest) {
       samePodcastLanguage: 'off',
       sameCompetitionGoal: 'off',
       sameGrade: 'off',
+      sameGender: 'off',
       ...rules,
     }
 

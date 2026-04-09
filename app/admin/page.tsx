@@ -106,6 +106,7 @@ export default function AdminDashboard() {
     samePodcastLanguage: 'off',
     sameCompetitionGoal: 'off',
     sameGrade: 'off',
+    sameGender: 'off',
   })
 
   function setRule(key: string, mode: RuleMode) {
@@ -674,6 +675,7 @@ export default function AdminDashboard() {
                     { key: 'samePodcastLanguage', label: 'Same podcast language preference', desc: 'Agree on recording language' },
                     { key: 'sameCompetitionGoal', label: 'Same competition goal', desc: 'Similar motivation (win/experience/etc.)' },
                     { key: 'sameGrade', label: 'Same grade', desc: 'Same school grade/year' },
+                    { key: 'sameGender', label: 'Same gender', desc: 'Participants with the same gender (ignores "no preference")' },
                   ].map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center px-3 py-2.5 gap-4">
                       <div className="w-48">

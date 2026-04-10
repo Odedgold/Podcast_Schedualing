@@ -7,7 +7,11 @@ export async function GET(_request: NextRequest) {
       include: {
         members: {
           include: {
-            participant: true,
+            participant: {
+              include: {
+                availability: { orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] },
+              },
+            },
           },
         },
       },

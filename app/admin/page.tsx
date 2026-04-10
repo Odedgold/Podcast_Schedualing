@@ -34,6 +34,13 @@ interface Participant {
   submittedAt: string
   availability: AvailabilitySlot[]
   customFields: CustomFieldResponse[]
+  grade?: string | null
+  gender?: string | null
+  hobbies?: string | null
+  englishLevel?: string | null
+  hebrewLevel?: string | null
+  podcastLanguage?: string | null
+  competitionGoal?: string | null
 }
 
 interface CustomField {
@@ -48,7 +55,7 @@ interface CustomField {
 }
 
 interface MatchMember {
-  participant: Participant
+  participant: Participant & { availability: AvailabilitySlot[] }
   role: string
 }
 
@@ -87,6 +94,8 @@ export default function AdminDashboard() {
   // Calendar controls
   const [colorMode, setColorMode] = useState<'individual' | 'school' | 'country'>('individual')
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  // Participant search & status
+  const [participantSearch, setParticipantSearch] = useState('')
   // Schools management
   const [schools, setSchools] = useState<{ id: string; name: string; isActive: boolean; sortOrder: number }[]>([])
   const [newSchoolName, setNewSchoolName] = useState('')
@@ -269,6 +278,61 @@ export default function AdminDashboard() {
     window.location.href = '/admin/login'
   }
 
+  async function toggleParticipantStatus(p: Participant) {
+    if (p.status === 'MATCHED') return
+    const next = p.status === 'INACTIVE' ? 'PENDING' : 'INACTIVE'
+    await fetch(`/api/admin/participants/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next }) })
+    fetchParticipants()
+  }
+
+  async function toggleSchoolStatus(schoolName: string) {
+    const schoolPs = participants.filter(p => p.schoolName === schoolName && p.status !== 'MATCHED')
+    const allInactive = schoolPs.every(p => p.status === 'INACTIVE')
+    const next = allInactive ? 'PENDING' : 'INACTIVE'
+    await Promise.all(schoolPs.map(p => fetch(`/api/admin/participants/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next }) })))
+    fetchParticipants()
+  }
+
+  function computeProsAndCons(a: Participant, b: Participant) {
+    const pros: string[] = []
+    const cons: string[] = []
+    if (a.schoolName !== b.schoolName) pros.push('בתי ספר שונים')
+    else cons.push('אותו בית ספר')
+    if (a.country !== b.country) pros.push(`מדינות שונות: ${a.country} / ${b.country}`)
+    else cons.push(`אותה מדינה: ${a.country}`)
+    if (a.englishLevel && b.englishLevel) {
+      if (a.englishLevel === b.englishLevel) pros.push(`רמת אנגלית זהה: ${a.englishLevel}`)
+      else cons.push(`רמת אנגלית שונה: ${a.englishLevel} / ${b.englishLevel}`)
+    }
+    if (a.hobbies && b.hobbies) {
+      const setA = new Set(a.hobbies.toLowerCase().split(',').map(h => h.trim()))
+      const shared = b.hobbies.toLowerCase().split(',').map(h => h.trim()).filter(h => setA.has(h))
+      if (shared.length > 0) pros.push(`תחביבים משותפים: ${shared.join(', ')}`)
+      else cons.push('אין תחביבים משותפים')
+    }
+    if (a.podcastLanguage && b.podcastLanguage) {
+      if (a.podcastLanguage === b.podcastLanguage) pros.push(`העדפת שפה זהה: ${a.podcastLanguage}`)
+      else cons.push(`העדפת שפה שונה: ${a.podcastLanguage} / ${b.podcastLanguage}`)
+    }
+    if (a.competitionGoal && b.competitionGoal) {
+      if (a.competitionGoal === b.competitionGoal) pros.push(`מטרת תחרות זהה`)
+      else cons.push(`מטרת תחרות שונה: ${a.competitionGoal} / ${b.competitionGoal}`)
+    }
+    if (a.grade && b.grade) {
+      const gap = Math.abs((parseInt(a.grade) || 0) - (parseInt(b.grade) || 0))
+      if (gap === 0) pros.push(`אותה כיתה: ${a.grade}`)
+      else if (gap === 1) cons.push(`פער כיתה: ${a.grade} / ${b.grade}`)
+      else cons.push(`פער כיתות: ${a.grade} / ${b.grade}`)
+    }
+    if (a.gender && b.gender && a.gender !== 'no_choice' && b.gender !== 'no_choice') {
+      if (a.gender === b.gender) pros.push(`אותו מגדר: ${a.gender}`)
+      else cons.push(`מגדרים שונים: ${a.gender} / ${b.gender}`)
+    }
+    return { pros, cons }
+  }
+
+  const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+
   async function addSchool() {
     if (!newSchoolName.trim()) return
     await fetch('/api/admin/schools', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSchoolName.trim() }) })
@@ -321,6 +385,13 @@ export default function AdminDashboard() {
   }
 
   const visibleParticipants = participants.filter((p) => !hiddenIds.has(p.id))
+
+  const filteredParticipants = participantSearch.trim()
+    ? participants.filter(p => {
+        const q = participantSearch.toLowerCase()
+        return p.fullName?.toLowerCase().includes(q) || p.schoolName?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q)
+      })
+    : participants
 
   const uniqueCountries = uniqueCountriesList
   const uniqueSchools = uniqueSchoolsList
@@ -392,48 +463,81 @@ export default function AdminDashboard() {
             </div>
 
             {viewMode === 'table' ? (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-left">
-                      <th className="px-4 py-3 font-medium text-gray-600">Name</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Email</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">School</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Country</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Timezone</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Status</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Slots</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Submitted</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {participants.map((p) => (
-                      <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{p.fullName || '(empty)'}</td>
-                        <td className="px-4 py-3 text-gray-600">{p.email}</td>
-                        <td className="px-4 py-3 text-gray-600">{p.schoolName}</td>
-                        <td className="px-4 py-3 text-gray-600">{p.country}</td>
-                        <td className="px-4 py-3 text-gray-600 text-xs">{p.confirmedTz}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            p.status === 'MATCHED' ? 'bg-green-100 text-green-700' :
-                            p.status === 'INACTIVE' ? 'bg-gray-100 text-gray-600' :
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {p.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">{p.availability.length}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">
-                          {DateTime.fromISO(p.submittedAt).toFormat('dd MMM yyyy')}
-                        </td>
+              <div className="space-y-3">
+                {/* Search + school toggles */}
+                <div className="flex flex-wrap gap-3 items-center">
+                  <input
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                    placeholder="Search by name, school or email..."
+                    value={participantSearch}
+                    onChange={(e) => setParticipantSearch(e.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {uniqueSchools.map((school) => {
+                      const schoolPs = participants.filter(p => p.schoolName === school && p.status !== 'MATCHED')
+                      const allInactive = schoolPs.length > 0 && schoolPs.every(p => p.status === 'INACTIVE')
+                      return (
+                        <button key={school} onClick={() => toggleSchoolStatus(school)}
+                          className={`text-xs px-3 py-1 rounded-full border transition-colors ${allInactive ? 'bg-gray-100 text-gray-400 border-gray-300 line-through' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'}`}
+                          title={allInactive ? 'Click to activate all' : 'Click to deactivate all'}>
+                          {school}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-left">
+                        <th className="px-4 py-3 font-medium text-gray-600">Name</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Email</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">School</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Country</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Timezone</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Status</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Slots</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Submitted</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Toggle</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {participants.length === 0 && (
-                  <p className="text-center text-gray-400 py-8">No participants yet</p>
-                )}
+                    </thead>
+                    <tbody>
+                      {filteredParticipants.map((p) => (
+                        <tr key={p.id} className={`border-b border-gray-50 hover:bg-gray-50 ${p.status === 'INACTIVE' ? 'opacity-50' : ''}`}>
+                          <td className="px-4 py-3 font-medium text-gray-900">{p.fullName || '(empty)'}</td>
+                          <td className="px-4 py-3 text-gray-600">{p.email}</td>
+                          <td className="px-4 py-3 text-gray-600">{p.schoolName}</td>
+                          <td className="px-4 py-3 text-gray-600">{p.country}</td>
+                          <td className="px-4 py-3 text-gray-600 text-xs">{p.confirmedTz}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              p.status === 'MATCHED' ? 'bg-green-100 text-green-700' :
+                              p.status === 'INACTIVE' ? 'bg-gray-100 text-gray-600' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {p.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{p.availability.length}</td>
+                          <td className="px-4 py-3 text-gray-400 text-xs">
+                            {DateTime.fromISO(p.submittedAt).toFormat('dd MMM yyyy')}
+                          </td>
+                          <td className="px-4 py-3">
+                            {p.status !== 'MATCHED' && (
+                              <button onClick={() => toggleParticipantStatus(p)}
+                                className={`text-xs px-2 py-1 rounded-lg border transition-colors ${p.status === 'INACTIVE' ? 'border-green-300 text-green-600 hover:bg-green-50' : 'border-gray-300 text-gray-500 hover:bg-gray-50'}`}>
+                                {p.status === 'INACTIVE' ? 'Activate' : 'Deactivate'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredParticipants.length === 0 && (
+                    <p className="text-center text-gray-400 py-8">No participants found</p>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -905,33 +1009,78 @@ export default function AdminDashboard() {
 
                         {/* Expanded details */}
                         {isExpanded && (
-                          <div className="border-t border-gray-100 px-4 py-3 space-y-3 bg-gray-50">
+                          <div className="border-t border-gray-100 px-4 py-3 space-y-4 bg-gray-50">
                             {/* Date & Time */}
                             <div>
-                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">תאריך ושעה</p>
-                              <p className="text-sm text-gray-800">
-                                {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')} (שעון ישראל)
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">תאריך ושעה (שעון ישראל)</p>
+                              <p className="text-sm text-gray-800 font-medium">
+                                {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')}
                               </p>
                             </div>
 
-                            {/* Participants details */}
+                            {/* Participants details + availability */}
                             <div>
-                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">משתתפים</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">משתתפים וזמינות</p>
                               <div className="grid grid-cols-1 gap-2">
-                                {members.map((m) => (
-                                  <div key={m.id} className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 space-y-0.5">
-                                    <div className="font-medium text-gray-900">{m.fullName}</div>
-                                    <div>{m.schoolName} · {m.country}</div>
-                                    {m.confirmedTz && <div className="text-gray-400">{m.confirmedTz}</div>}
-                                  </div>
-                                ))}
+                                {match.members.map((mm) => {
+                                  const p = mm.participant as Participant & { availability: AvailabilitySlot[] }
+                                  return (
+                                    <div key={mm.role + p.id} className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                                      <div className="font-semibold text-gray-900 mb-1">{p.fullName} <span className="font-normal text-gray-400">· {p.schoolName} · {p.country}</span></div>
+                                      <div className="text-gray-400 mb-1.5">{p.confirmedTz}</div>
+                                      {p.availability && p.availability.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                          {p.availability.map((slot) => (
+                                            <span key={slot.id} className="bg-blue-50 border border-blue-200 text-blue-700 rounded px-1.5 py-0.5 text-[11px]">
+                                              {DAY_NAMES[slot.dayOfWeek]} {slot.startTime}–{slot.endTime}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400 italic">אין זמינות רשומה</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
                               </div>
                             </div>
+
+                            {/* Pros & Cons (PAIR only) */}
+                            {match.matchType === 'PAIR' && match.members.length === 2 && (() => {
+                              const pa = match.members[0].participant as Participant
+                              const pb = match.members[1].participant as Participant
+                              const { pros, cons } = computeProsAndCons(pa, pb)
+                              return (
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">יתרונות וחסרונות</p>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-green-700 mb-1">יתרונות</p>
+                                      {pros.length === 0 && <p className="text-xs text-gray-400 italic">אין</p>}
+                                      {pros.map((pro, i) => (
+                                        <div key={i} className="flex items-start gap-1 text-xs text-green-800 bg-green-50 border border-green-200 rounded px-2 py-1">
+                                          <span className="shrink-0">✓</span><span>{pro}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-red-700 mb-1">חסרונות</p>
+                                      {cons.length === 0 && <p className="text-xs text-gray-400 italic">אין</p>}
+                                      {cons.map((con, i) => (
+                                        <div key={i} className="flex items-start gap-1 text-xs text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
+                                          <span className="shrink-0">✗</span><span>{con}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })()}
 
                             {/* System Notes */}
                             {match.systemNotes && (
                               <div>
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">הערות מערכת</p>
+                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">התראות מערכת</p>
                                 <div className="space-y-1">
                                   {match.systemNotes.split(' | ').map((note, i) => (
                                     <div key={i} className="flex items-start gap-1.5 text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">

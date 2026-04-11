@@ -698,7 +698,7 @@ export default function AdminDashboard() {
         {tab === 'fields' && (
           <div>
             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5 text-sm text-blue-800">
-              <strong>Custom Fields</strong> — מגדיר אילו שאלות יופיעו בטופס הרישום של המשתתפים (למשל: כיתה, מגדר, רמת אנגלית). לכל שדה ניתן לקבוע גם <strong>כיצד הוא משפיע על השיבוץ</strong>: Off = לא משפיע, Preferred = מוסיף נקודות אם התנאי מתקיים, Mandatory = חייב להתקיים כדי לשבץ.
+              <strong>Custom Fields</strong> — Define which questions appear in the registration form (e.g. grade, gender, English level). For each field you can also set <strong>how it affects matching</strong>: <em>Off</em> = ignored, <em>Preferred</em> = adds score points when condition is met, <em>Mandatory</em> = must be satisfied for a match to be created.
             </div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Custom Fields</h2>
@@ -841,7 +841,7 @@ export default function AdminDashboard() {
         {tab === 'matching' && (
           <div className="max-w-2xl">
             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5 text-sm text-blue-800">
-              <strong>Matching Engine</strong> — כאן מריצים את אלגוריתם השיבוץ. בוחרים אוכלוסיות (צד A מול צד B), מגדירים 3 כללים מבניים (זמינות, בית ספר, מדינה), ולוחצים Run. כללי השדות המותאמים מוגדרים בטאב <strong>Custom Fields</strong> ומיושמים אוטומטית בכל הרצה.
+              <strong>Matching Engine</strong> — Run the matching algorithm. Select populations (Side A vs Side B), configure 3 structural rules (availability, school, country), then click Run. Rules defined in <strong>Custom Fields</strong> are applied automatically on every run.
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Matching Engine</h2>
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-6">

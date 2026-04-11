@@ -80,11 +80,35 @@ function pickN<T>(arr: T[], n: number): T[] {
   return out
 }
 
-function randomAvailability() {
+// Hours are LOCAL time per timezone.
+// We want UTC overlap ~17:00-21:00 UTC:
+//   Israel UTC+3 → 20:00-00:00 local
+//   USA Eastern UTC-5 → 12:00-16:00 local
+//   USA Pacific UTC-8 → 09:00-13:00 local
+//   Egypt/Jordan UTC+2 → 19:00-23:00 local
+//   Europe UTC+1/2 → 18:00-22:00 local
+const TZ_LOCAL_HOURS: Record<string, number[]> = {
+  'Asia/Jerusalem': [20, 21, 22],
+  'America/New_York': [12, 13, 14],
+  'America/Chicago': [11, 12, 13],
+  'America/Los_Angeles': [9, 10, 11],
+  'America/Toronto': [12, 13, 14],
+  'America/Vancouver': [9, 10, 11],
+  'America/Sao_Paulo': [14, 15, 16],
+  'Africa/Cairo': [19, 20, 21],
+  'Asia/Amman': [20, 21, 22],
+  'Europe/London': [18, 19, 20],
+  'Europe/Berlin': [19, 20, 21],
+  'Europe/Paris': [19, 20, 21],
+  'Australia/Sydney': [4, 5, 6],  // next-day UTC but still overlaps
+}
+
+function randomAvailability(tz: string) {
   const slots: { dayOfWeek: number; startTime: string; endTime: string }[] = []
+  const hours = TZ_LOCAL_HOURS[tz] ?? [18, 19, 20]
   const days = pickN([0, 1, 2, 3, 4, 5, 6], 2 + Math.floor(Math.random() * 3))
   for (const day of days) {
-    const startH = 15 + Math.floor(Math.random() * 5)
+    const startH = pick(hours)
     const start = `${String(startH).padStart(2, '0')}:00`
     const end = `${String(startH + 1).padStart(2, '0')}:30`
     slots.push({ dayOfWeek: day, startTime: start, endTime: end })
@@ -122,7 +146,7 @@ async function main() {
       data: {
         label: 'English Level', fieldKey: 'english_level', fieldType: 'SELECT',
         options: ENGLISH_LEVELS, isRequired: true, sortOrder: 3,
-        matchingMode: 'MANDATORY', matchingType: 'SAME_VALUE', matchingWeight: 4,
+        matchingMode: 'PREFERRED', matchingType: 'SAME_VALUE', matchingWeight: 4,
       },
     })
     const hobbiesField = await prisma.customFieldDefinition.create({
@@ -173,7 +197,7 @@ async function main() {
           detectedTz: loc.tz,
           confirmedTz: loc.tz,
           status: 'PENDING',
-          availability: { create: randomAvailability() },
+          availability: { create: randomAvailability(loc.tz) },
           customFields: {
             create: [
               { fieldId: genderField.id, value: gender },

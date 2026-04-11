@@ -221,8 +221,10 @@ export async function POST(request: NextRequest) {
     const {
       matchType = 'PAIR',
       groupSize = 3,
-      countries,
-      schools,
+      countrySideA = [],
+      countrySideB = [],
+      schoolSideA = [],
+      schoolSideB = [],
       rules = {},
       countryGroupA = [],
       countryGroupRule = 'any',
@@ -242,16 +244,37 @@ export async function POST(request: NextRequest) {
       ...rules,
     }
 
+    // Determine which countries/schools are in play at all
+    const allSelectedCountries = [...new Set([...countrySideA, ...countrySideB])]
+    const allSelectedSchools = [...new Set([...schoolSideA, ...schoolSideB])]
+
     const participantFilter: Record<string, unknown> = { status: 'PENDING' }
-    if (countries && Array.isArray(countries) && countries.length > 0) participantFilter.country = { in: countries }
-    if (schools && Array.isArray(schools) && schools.length > 0) participantFilter.schoolName = { in: schools }
+    if (allSelectedCountries.length > 0) participantFilter.country = { in: allSelectedCountries }
+    if (allSelectedSchools.length > 0) participantFilter.schoolName = { in: allSelectedSchools }
 
     const participants = await prisma.participant.findMany({
       where: participantFilter,
       include: { availability: { orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] } },
     })
 
-    const eligible: ParticipantWithSlots[] = participants.filter((p) => p.availability.length > 0).map((p) => ({
+    // Determine if a participant belongs to side A or B (or both if no filter set)
+    const hasSideFilter = countrySideA.length > 0 || countrySideB.length > 0 || schoolSideA.length > 0 || schoolSideB.length > 0
+
+    function getSide(p: { country: string; schoolName: string }): 'A' | 'B' | 'both' {
+      if (!hasSideFilter) return 'both'
+      const inCountryA = countrySideA.length === 0 || countrySideA.includes(p.country)
+      const inCountryB = countrySideB.length === 0 || countrySideB.includes(p.country)
+      const inSchoolA = schoolSideA.length === 0 || schoolSideA.includes(p.schoolName)
+      const inSchoolB = schoolSideB.length === 0 || schoolSideB.includes(p.schoolName)
+      const isA = inCountryA && inSchoolA
+      const isB = inCountryB && inSchoolB
+      if (isA && isB) return 'both'
+      if (isA) return 'A'
+      if (isB) return 'B'
+      return 'both' // fallback
+    }
+
+    const eligible: (ParticipantWithSlots & { side: 'A' | 'B' | 'both' })[] = participants.filter((p) => p.availability.length > 0).map((p) => ({
       id: p.id,
       fullName: p.fullName,
       schoolName: p.schoolName,
@@ -264,6 +287,7 @@ export async function POST(request: NextRequest) {
       grade: p.grade,
       gender: p.gender,
       availability: p.availability,
+      side: getSide(p),
     }))
 
     const createdMatches: string[] = []
@@ -280,6 +304,11 @@ export async function POST(request: NextRequest) {
 
         for (let j = i + 1; j < eligible.length; j++) {
           if (matched.has(eligible[j].id)) continue
+          // Side compatibility: A must pair with B (or both)
+          const sideI = eligible[i].side
+          const sideJ = eligible[j].side
+          const sidesOk = sideI === 'both' || sideJ === 'both' || sideI !== sideJ
+          if (!sidesOk) continue
           const { valid, score, overlap } = scoreAndValidatePair(eligible[i], eligible[j], defaultRules, countryGroupA, countryGroupRule as GroupRule, gradeGap)
           if (valid && score > bestScore) {
             bestScore = score

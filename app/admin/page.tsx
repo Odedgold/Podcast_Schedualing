@@ -105,8 +105,11 @@ export default function AdminDashboard() {
   const [groupSize, setGroupSize] = useState(3)
   const [filterCountry, setFilterCountry] = useState('')
   const [filterSchool, setFilterSchool] = useState('')
-  const [selectedCountries, setSelectedCountries] = useState<string[]>([])
-  const [selectedSchools, setSelectedSchools] = useState<string[]>([])
+  // Side A / Side B populations
+  const [countrySideA, setCountrySideA] = useState<string[]>([])
+  const [countrySideB, setCountrySideB] = useState<string[]>([])
+  const [schoolSideA, setSchoolSideA] = useState<string[]>([])
+  const [schoolSideB, setSchoolSideB] = useState<string[]>([])
   // Calendar popup
   const [calendarPopup, setCalendarPopup] = useState<{ participant: Participant; x: number; y: number } | null>(null)
 
@@ -206,7 +209,13 @@ export default function AdminDashboard() {
     const res = await fetch('/api/admin/matches/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchType, groupSize, countries: selectedCountries.length > 0 ? selectedCountries : undefined, schools: selectedSchools.length > 0 ? selectedSchools : undefined, rules, countryGroupA, countryGroupRule, gradeGap }),
+      body: JSON.stringify({
+        matchType, groupSize, rules, countryGroupA, countryGroupRule, gradeGap,
+        countrySideA: countrySideA.length > 0 ? countrySideA : undefined,
+        countrySideB: countrySideB.length > 0 ? countrySideB : undefined,
+        schoolSideA: schoolSideA.length > 0 ? schoolSideA : undefined,
+        schoolSideB: schoolSideB.length > 0 ? schoolSideB : undefined,
+      }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -852,42 +861,74 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Country & School selection */}
-              <div className="space-y-3">
+              {/* Population selection: Side A vs Side B */}
+              <div className="space-y-4">
+                <p className="text-sm text-gray-500">בחר אוכלוסיות לשיבוץ — צד A מול צד B. אם לא בוחרים כלום, כל המשתתפים נכנסים.</p>
+
+                {/* Countries */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium text-gray-700">מדינות לשיבוץ</label>
-                    <div className="flex gap-2">
-                      <button onClick={() => setSelectedCountries([...uniqueCountries])} className="text-xs text-blue-600 hover:underline">הכל</button>
-                      <button onClick={() => setSelectedCountries([])} className="text-xs text-gray-400 hover:underline">נקה</button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 mb-2">{selectedCountries.length === 0 ? 'כל המדינות' : `${selectedCountries.length} נבחרו`}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {uniqueCountries.map((c) => (
-                      <button key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedCountries.includes(c) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
-                        {c}
-                      </button>
-                    ))}
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">מדינות</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(['A', 'B'] as const).map((side) => {
+                      const selected = side === 'A' ? countrySideA : countrySideB
+                      const setSelected = side === 'A' ? setCountrySideA : setCountrySideB
+                      const color = side === 'A' ? 'blue' : 'orange'
+                      return (
+                        <div key={side} className={`border-2 rounded-xl p-3 ${side === 'A' ? 'border-blue-200 bg-blue-50/40' : 'border-orange-200 bg-orange-50/40'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${side === 'A' ? 'bg-blue-600 text-white' : 'bg-orange-500 text-white'}`}>צד {side}</span>
+                            <div className="flex gap-2">
+                              <button onClick={() => setSelected([...uniqueCountries])} className="text-xs text-gray-500 hover:underline">הכל</button>
+                              <button onClick={() => setSelected([])} className="text-xs text-gray-400 hover:underline">נקה</button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {uniqueCountries.map((c) => (
+                              <button key={c} onClick={() => setSelected(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${selected.includes(c)
+                                  ? side === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-orange-500 text-white border-orange-500'
+                                  : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
+                                {c}
+                              </button>
+                            ))}
+                          </div>
+                          {selected.length === 0 && <p className="text-xs text-gray-400 mt-2 italic">כל המדינות</p>}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
+
+                {/* Schools */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium text-gray-700">בתי ספר לשיבוץ</label>
-                    <div className="flex gap-2">
-                      <button onClick={() => setSelectedSchools([...uniqueSchools])} className="text-xs text-blue-600 hover:underline">הכל</button>
-                      <button onClick={() => setSelectedSchools([])} className="text-xs text-gray-400 hover:underline">נקה</button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 mb-2">{selectedSchools.length === 0 ? 'כל בתי הספר' : `${selectedSchools.length} נבחרו`}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {uniqueSchools.map((s) => (
-                      <button key={s} onClick={() => setSelectedSchools(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedSchools.includes(s) ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'}`}>
-                        {s}
-                      </button>
-                    ))}
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">בתי ספר</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(['A', 'B'] as const).map((side) => {
+                      const selected = side === 'A' ? schoolSideA : schoolSideB
+                      const setSelected = side === 'A' ? setSchoolSideA : setSchoolSideB
+                      return (
+                        <div key={side} className={`border-2 rounded-xl p-3 ${side === 'A' ? 'border-blue-200 bg-blue-50/40' : 'border-orange-200 bg-orange-50/40'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${side === 'A' ? 'bg-blue-600 text-white' : 'bg-orange-500 text-white'}`}>צד {side}</span>
+                            <div className="flex gap-2">
+                              <button onClick={() => setSelected([...uniqueSchools])} className="text-xs text-gray-500 hover:underline">הכל</button>
+                              <button onClick={() => setSelected([])} className="text-xs text-gray-400 hover:underline">נקה</button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {uniqueSchools.map((s) => (
+                              <button key={s} onClick={() => setSelected(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${selected.includes(s)
+                                  ? side === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-orange-500 text-white border-orange-500'
+                                  : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                          {selected.length === 0 && <p className="text-xs text-gray-400 mt-2 italic">כל בתי הספר</p>}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               </div>

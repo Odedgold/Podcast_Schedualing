@@ -105,6 +105,10 @@ export default function AdminDashboard() {
   const [groupSize, setGroupSize] = useState(3)
   const [filterCountry, setFilterCountry] = useState('')
   const [filterSchool, setFilterSchool] = useState('')
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([])
+  const [selectedSchools, setSelectedSchools] = useState<string[]>([])
+  // Calendar popup
+  const [calendarPopup, setCalendarPopup] = useState<{ participant: Participant; x: number; y: number } | null>(null)
 
   // Country group state
   const [countryGroupA, setCountryGroupA] = useState<string[]>([])
@@ -202,7 +206,7 @@ export default function AdminDashboard() {
     const res = await fetch('/api/admin/matches/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchType, groupSize, country: filterCountry || undefined, schoolName: filterSchool || undefined, rules, countryGroupA, countryGroupRule, gradeGap }),
+      body: JSON.stringify({ matchType, groupSize, countries: selectedCountries.length > 0 ? selectedCountries : undefined, schools: selectedSchools.length > 0 ? selectedSchools : undefined, rules, countryGroupA, countryGroupRule, gradeGap }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -651,11 +655,15 @@ export default function AdminDashboard() {
                           return (
                             <div key={time} className="h-10 border-b border-gray-50 relative flex" onMouseLeave={() => setTooltip(null)}>
                               {occupants.map((p) => (
-                                <div key={p.id} className="flex-1 opacity-80"
+                                <div key={p.id} className="flex-1 opacity-80 cursor-pointer"
                                   style={{ backgroundColor: getGroupColor(p) }}
                                   onMouseEnter={(e) => {
                                     const rect = e.currentTarget.getBoundingClientRect()
                                     setTooltip({ x: rect.left, y: rect.top - 30, name: occupants.map(o => o.fullName || o.email).join(', ') })
+                                  }}
+                                  onClick={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    setCalendarPopup(prev => prev?.participant.id === p.id ? null : { participant: p, x: rect.left, y: rect.bottom + 8 })
                                   }}
                                 />
                               ))}
@@ -670,6 +678,31 @@ export default function AdminDashboard() {
                 {tooltip && (
                   <div className="fixed z-50 bg-gray-900 text-white text-xs px-2 py-1 rounded pointer-events-none" style={{ left: tooltip.x, top: tooltip.y }}>
                     {tooltip.name}
+                  </div>
+                )}
+
+                {calendarPopup && (
+                  <div className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-64 text-sm"
+                    style={{ left: Math.min(calendarPopup.x, window.innerWidth - 280), top: Math.min(calendarPopup.y, window.innerHeight - 220) }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-gray-900">{calendarPopup.participant.fullName}</span>
+                      <button onClick={() => setCalendarPopup(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">בית ספר</span><span>{calendarPopup.participant.schoolName}</span></div>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">מדינה</span><span>{calendarPopup.participant.country}</span></div>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">עיר</span><span>{calendarPopup.participant.city}</span></div>
+                      {calendarPopup.participant.grade && <div className="flex gap-1"><span className="text-gray-400 w-16">כיתה</span><span>{calendarPopup.participant.grade}</span></div>}
+                      {calendarPopup.participant.gender && calendarPopup.participant.gender !== 'no_choice' && (
+                        <div className="flex gap-1"><span className="text-gray-400 w-16">מגדר</span><span>{calendarPopup.participant.gender === 'male' ? 'זכר' : 'נקבה'}</span></div>
+                      )}
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">סטטוס</span>
+                        <span className={`px-1.5 rounded-full text-[10px] font-medium ${calendarPopup.participant.status === 'MATCHED' ? 'bg-green-100 text-green-700' : calendarPopup.participant.status === 'INACTIVE' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {calendarPopup.participant.status}
+                        </span>
+                      </div>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">זמינויות</span><span>{calendarPopup.participant.availability.length} סלוטים</span></div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -819,23 +852,43 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Filters */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Country & School selection */}
+              <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-600 mb-1 block">Filter by Country</label>
-                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
-                    <option value="">All countries</option>
-                    {uniqueCountries.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-medium text-gray-700">מדינות לשיבוץ</label>
+                    <div className="flex gap-2">
+                      <button onClick={() => setSelectedCountries([...uniqueCountries])} className="text-xs text-blue-600 hover:underline">הכל</button>
+                      <button onClick={() => setSelectedCountries([])} className="text-xs text-gray-400 hover:underline">נקה</button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-2">{selectedCountries.length === 0 ? 'כל המדינות' : `${selectedCountries.length} נבחרו`}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {uniqueCountries.map((c) => (
+                      <button key={c} onClick={() => setSelectedCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedCountries.includes(c) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-600 mb-1 block">Filter by School</label>
-                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    value={filterSchool} onChange={(e) => setFilterSchool(e.target.value)}>
-                    <option value="">All schools</option>
-                    {uniqueSchools.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-medium text-gray-700">בתי ספר לשיבוץ</label>
+                    <div className="flex gap-2">
+                      <button onClick={() => setSelectedSchools([...uniqueSchools])} className="text-xs text-blue-600 hover:underline">הכל</button>
+                      <button onClick={() => setSelectedSchools([])} className="text-xs text-gray-400 hover:underline">נקה</button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-2">{selectedSchools.length === 0 ? 'כל בתי הספר' : `${selectedSchools.length} נבחרו`}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {uniqueSchools.map((s) => (
+                      <button key={s} onClick={() => setSelectedSchools(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedSchools.includes(s) ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -949,12 +1002,32 @@ export default function AdminDashboard() {
                   </div>
                   {matchResult.unmatchedCount > 0 && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
-                      ⚠️ <strong>{matchResult.unmatchedCount}</strong> משתתפים לא שובצו
-                      {matchResult.unmatched.map((u) => (
-                        <div key={u.id} className="mt-1 text-xs">
-                          • {u.fullName} ({u.schoolName}, {u.country}){u.warnings.length > 0 && ` — ${u.warnings.join(', ')}`}
-                        </div>
-                      ))}
+                      <p className="font-medium mb-2">⚠️ {matchResult.unmatchedCount} משתתפים לא שובצו</p>
+                      <div className="space-y-2">
+                        {matchResult.unmatched.map((u: { id: string; fullName: string; schoolName: string; country: string; warnings: string[]; blockers: string[] }) => (
+                          <div key={u.id} className="bg-white border border-yellow-200 rounded-lg px-3 py-2 text-xs">
+                            <div className="font-medium text-gray-900 mb-1">{u.fullName} <span className="font-normal text-gray-500">· {u.schoolName} · {u.country}</span></div>
+                            {u.blockers && u.blockers.length > 0 && (
+                              <div className="space-y-0.5">
+                                {u.blockers.map((b, i) => (
+                                  <div key={i} className="flex items-start gap-1 text-red-700">
+                                    <span className="shrink-0">🔒</span><span>{b}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {u.warnings && u.warnings.length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {u.warnings.map((w, i) => (
+                                  <div key={i} className="flex items-start gap-1 text-yellow-700">
+                                    <span className="shrink-0">⚠️</span><span>{w}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

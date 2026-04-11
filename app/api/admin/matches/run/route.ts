@@ -221,8 +221,8 @@ export async function POST(request: NextRequest) {
     const {
       matchType = 'PAIR',
       groupSize = 3,
-      country,
-      schoolName,
+      countries,
+      schools,
       rules = {},
       countryGroupA = [],
       countryGroupRule = 'any',
@@ -243,8 +243,8 @@ export async function POST(request: NextRequest) {
     }
 
     const participantFilter: Record<string, unknown> = { status: 'PENDING' }
-    if (country) participantFilter.country = country
-    if (schoolName) participantFilter.schoolName = schoolName
+    if (countries && Array.isArray(countries) && countries.length > 0) participantFilter.country = { in: countries }
+    if (schools && Array.isArray(schools) && schools.length > 0) participantFilter.schoolName = { in: schools }
 
     const participants = await prisma.participant.findMany({
       where: participantFilter,
@@ -363,11 +363,45 @@ export async function POST(request: NextRequest) {
       .filter((p) => !matchedIds.has(p.id))
       .map((p) => {
         const warnings: string[] = []
+        const blockers: string[] = []
+
+        // Isolation checks
         const sameSchoolCount = eligible.filter(q => q.schoolName === p.schoolName && q.id !== p.id).length
         if (sameSchoolCount === 0) warnings.push(`בית הספר היחיד מ-${p.schoolName}`)
         const sameCountryCount = eligible.filter(q => q.country === p.country && q.id !== p.id).length
         if (sameCountryCount === 0) warnings.push(`המשתתף היחיד מ-${p.country}`)
-        return { id: p.id, fullName: p.fullName, schoolName: p.schoolName, country: p.country, warnings }
+
+        // Rule blockers — explain WHY no match was found
+        const others = eligible.filter(q => q.id !== p.id && !matchedIds.has(q.id))
+        if (others.length === 0) {
+          blockers.push('אין משתתפים פנויים אחרים לשיבוץ')
+        } else {
+          const hasOverlap = others.some(q => findAvailabilityOverlap(p.availability, p.confirmedTz, q.availability, q.confirmedTz))
+          if (!hasOverlap && defaultRules.availability === 'mandatory') blockers.push('אין חפיפת זמנים עם אף משתתף אחר — שנה כלל זמינות ל-Off/Preferred')
+
+          if (defaultRules.differentSchool === 'mandatory') {
+            const sameSchool = others.every(q => q.schoolName === p.schoolName)
+            if (sameSchool) blockers.push('כולם מאותו בית ספר — שנה כלל בית ספר')
+          }
+          if (defaultRules.differentCountry === 'mandatory') {
+            const sameCountry = others.every(q => q.country === p.country)
+            if (sameCountry) blockers.push('כולם מאותה מדינה — שנה כלל מדינה')
+          }
+          if (defaultRules.sameEnglishLevel === 'mandatory') {
+            const noMatch = !others.some(q => q.englishLevel === p.englishLevel)
+            if (noMatch) blockers.push(`אף אחד ברמת אנגלית ${p.englishLevel} — שנה כלל רמת אנגלית`)
+          }
+          if (defaultRules.sameGender === 'mandatory' && p.gender && p.gender !== 'no_choice') {
+            const noMatch = !others.some(q => q.gender === p.gender)
+            if (noMatch) blockers.push(`אין משתתף אחר עם מגדר ${p.gender} — שנה כלל מגדר`)
+          }
+          if (defaultRules.sameGrade === 'mandatory') {
+            const noMatch = !others.some(q => gradeWithinGap(p.grade, q.grade, gradeGap))
+            if (noMatch) blockers.push(`אין משתתף בטווח הכיתה — הרחב את פער הכיתות`)
+          }
+        }
+
+        return { id: p.id, fullName: p.fullName, schoolName: p.schoolName, country: p.country, warnings, blockers }
       })
 
     return Response.json({

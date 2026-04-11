@@ -3,6 +3,10 @@ generator client {
   output   = "../app/generated/prisma"
 }
 
+datasource db {
+  provider = "postgresql"
+}
+
 model School {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -11,21 +15,23 @@ model School {
   createdAt DateTime @default(now())
 }
 
-datasource db {
-  provider = "postgresql"
-}
-
+// Defines a dynamic form field + how it affects matching
 model CustomFieldDefinition {
-  id         String    @id @default(cuid())
-  label      String
-  fieldKey   String    @unique
-  fieldType  FieldType @default(TEXT)
-  options    String[]  @default([])
-  isRequired Boolean   @default(false)
-  isActive   Boolean   @default(true)
-  sortOrder  Int       @default(0)
-  createdAt  DateTime  @default(now())
-  responses  CustomFieldResponse[]
+  id             String         @id @default(cuid())
+  label          String                        // shown in form & admin
+  fieldKey       String         @unique        // internal key, e.g. "english_level"
+  fieldType      FieldType      @default(TEXT)
+  options        String[]       @default([])   // for SELECT / MULTISELECT
+  placeholder    String?                       // hint text in form
+  isRequired     Boolean        @default(false)
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
+  // Matching config
+  matchingMode   MatchingMode   @default(OFF)  // OFF | PREFERRED | MANDATORY
+  matchingType   MatchingType   @default(SAME_VALUE) // how to compare two values
+  matchingWeight Int            @default(3)    // score bonus when PREFERRED matches
+  createdAt      DateTime       @default(now())
+  responses      CustomFieldResponse[]
 }
 
 enum FieldType {
@@ -35,28 +41,35 @@ enum FieldType {
   MULTISELECT
 }
 
+enum MatchingMode {
+  OFF
+  PREFERRED
+  MANDATORY
+}
+
+enum MatchingType {
+  SAME_VALUE       // both must have identical value
+  DIFFERENT_VALUE  // both must have different value
+  NUMERIC_GAP      // |a - b| <= matchingWeight (weight reused as max gap)
+  ANY_VALUE        // just having any value is enough (e.g. "filled in")
+}
+
 model Participant {
   id               String            @id @default(cuid())
   submissionToken  String            @unique @default(cuid())
+  // Core fixed fields (always present)
   fullName         String
   email            String
   phone            String?
   schoolName       String
   city             String
   country          String
-  grade            String?
-  gender           String?
-  hobbies          String?
-  englishLevel     String?
-  hebrewLevel      String?
-  podcastLanguage  String?
-  competitionGoal  String?
-  additionalInfo   String?
   detectedTz       String
   confirmedTz      String
   status           ParticipantStatus @default(PENDING)
   submittedAt      DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  // All other data lives in customFields
   customFields     CustomFieldResponse[]
   availability     AvailabilitySlot[]
   matchMembers     MatchMember[]

@@ -4,98 +4,17 @@ import { useState, useEffect, use } from 'react'
 import { PRIORITY_TIMEZONES, ALL_TIMEZONES } from '@/lib/timezone'
 
 type Lang = 'en' | 'he' | 'es'
+type FieldType = 'TEXT' | 'NUMBER' | 'SELECT' | 'MULTISELECT'
 
-const ENGLISH_LEVELS: Record<Lang, { value: string; label: string }[]> = {
-  en: [
-    { value: 'beginner', label: 'Beginner' },
-    { value: 'elementary', label: 'Elementary' },
-    { value: 'intermediate', label: 'Intermediate' },
-    { value: 'upper-intermediate', label: 'Upper-Intermediate' },
-    { value: 'advanced', label: 'Advanced' },
-    { value: 'native', label: 'Native' },
-  ],
-  he: [
-    { value: 'beginner', label: 'מתחיל/ה' },
-    { value: 'elementary', label: 'בסיסי/ת' },
-    { value: 'intermediate', label: 'בינוני/ת' },
-    { value: 'upper-intermediate', label: 'טוב מאוד' },
-    { value: 'advanced', label: 'שולט/ת' },
-    { value: 'native', label: 'שפת אם' },
-  ],
-  es: [
-    { value: 'beginner', label: 'Principiante' },
-    { value: 'elementary', label: 'Elemental' },
-    { value: 'intermediate', label: 'Intermedio' },
-    { value: 'upper-intermediate', label: 'Intermedio-Alto' },
-    { value: 'advanced', label: 'Avanzado' },
-    { value: 'native', label: 'Nativo' },
-  ],
-}
-
-const HEBREW_LEVELS: Record<Lang, { value: string; label: string }[]> = {
-  en: [
-    { value: 'none', label: 'No Hebrew' },
-    { value: 'beginner', label: 'Beginner' },
-    { value: 'elementary', label: 'Elementary' },
-    { value: 'intermediate', label: 'Intermediate' },
-    { value: 'advanced', label: 'Advanced' },
-    { value: 'native', label: 'Native' },
-  ],
-  he: [
-    { value: 'none', label: 'ללא עברית' },
-    { value: 'beginner', label: 'מתחיל/ה' },
-    { value: 'elementary', label: 'בסיסי/ת' },
-    { value: 'intermediate', label: 'בינוני/ת' },
-    { value: 'advanced', label: 'שולט/ת' },
-    { value: 'native', label: 'שפת אם' },
-  ],
-  es: [
-    { value: 'none', label: 'Sin hebreo' },
-    { value: 'beginner', label: 'Principiante' },
-    { value: 'elementary', label: 'Elemental' },
-    { value: 'intermediate', label: 'Intermedio' },
-    { value: 'advanced', label: 'Avanzado' },
-    { value: 'native', label: 'Nativo' },
-  ],
-}
-
-const PODCAST_LANGUAGE_OPTIONS: Record<Lang, { value: string; label: string }[]> = {
-  en: [
-    { value: 'english', label: 'I prefer to challenge myself in English' },
-    { value: 'hebrew', label: 'Hebrew' },
-    { value: 'no_preference', label: "I don't mind" },
-  ],
-  he: [
-    { value: 'english', label: 'מעדיפ/ה לאתגר את עצמי באנגלית' },
-    { value: 'hebrew', label: 'עברית' },
-    { value: 'no_preference', label: 'לא אכפת לי' },
-  ],
-  es: [
-    { value: 'english', label: 'Prefiero desafiarme en inglés' },
-    { value: 'hebrew', label: 'Hebreo' },
-    { value: 'no_preference', label: 'No me importa' },
-  ],
-}
-
-const COMPETITION_GOAL_OPTIONS: Record<Lang, { value: string; label: string }[]> = {
-  en: [
-    { value: 'win', label: 'My team wins' },
-    { value: 'quality', label: "I'll invest a lot so we have an excellent podcast" },
-    { value: 'experience', label: 'I participate for the experience' },
-    { value: 'connect', label: 'I participate to meet a new friend from the diaspora' },
-  ],
-  he: [
-    { value: 'win', label: 'הצוות שלי ינצח' },
-    { value: 'quality', label: 'אשקיע הרבה כדי שיהיה לנו פודקאסט מעולה' },
-    { value: 'experience', label: 'אני משתתפ/ת בשביל החוויה' },
-    { value: 'connect', label: 'אני משתתפ/ת כדי להכיר חבר/ה חדש/ה מהתפוצות' },
-  ],
-  es: [
-    { value: 'win', label: 'Mi equipo gana' },
-    { value: 'quality', label: 'Invertiré mucho para que tengamos un podcast excelente' },
-    { value: 'experience', label: 'Participo por la experiencia' },
-    { value: 'connect', label: 'Participo para conocer un nuevo amigo de la diáspora' },
-  ],
+interface FieldDef {
+  id: string
+  label: string
+  fieldKey: string
+  fieldType: FieldType
+  options: string[]
+  placeholder?: string | null
+  isRequired: boolean
+  sortOrder: number
 }
 
 const DAY_LABELS: Record<Lang, string[]> = {
@@ -107,130 +26,53 @@ const DAY_LABELS: Record<Lang, string[]> = {
 const T: Record<Lang, Record<string, string>> = {
   en: {
     title: 'Registration Form',
-    step1: 'Personal Info',
-    step2: 'Questions',
-    step3: 'Availability',
-    fullName: 'Full Name',
-    email: 'Email',
-    phone: 'Phone (optional)',
-    school: 'School Name',
-    city: 'City',
-    country: 'Country',
-    grade: 'Grade',
-    gender: 'Gender',
-    genderMale: 'Male',
-    genderFemale: 'Female',
-    genderNoChoice: 'Prefer not to say',
-    hobbies: 'Hobbies',
-    englishLevel: 'English Level',
-    hebrewLevel: 'Hebrew Level',
-    selectEnglishLevel: 'Select your level...',
-    selectHebrewLevel: 'Select your level...',
-    timezone: 'Your Timezone',
-    timezoneSearch: 'Search timezone...',
-    priorityTz: 'Common Timezones',
-    allTz: 'All Timezones',
-    next: 'Next',
-    back: 'Back',
-    submit: 'Submit',
-    submitting: 'Submitting...',
+    step1: 'Personal Info', step2: 'Questions', step3: 'Availability',
+    fullName: 'Full Name', email: 'Email', phone: 'Phone (optional)',
+    school: 'School Name', city: 'City', country: 'Country',
+    timezone: 'Your Timezone', timezoneSearch: 'Search timezone...',
+    priorityTz: 'Common Timezones', allTz: 'All Timezones',
+    next: 'Next', back: 'Back', submit: 'Submit', submitting: 'Submitting...',
     availTitle: 'Select Your Availability',
     availSubtitle: 'Click slots when you are free (30-minute blocks, 6:00–23:00)',
     slotsSelected: 'slots selected',
-    successTitle: 'Thank you!',
-    successMsg: 'Your availability has been submitted successfully.',
-    required: 'This field is required',
-    invalidEmail: 'Please enter a valid email',
-    podcastLangQuestion: 'Which language do you prefer to record the podcast in?',
-    competitionGoalQuestion: 'How important is winning the competition to you?',
-    additionalInfo: 'Anything else you think is important we should know?',
-    additionalInfoPlaceholder: 'Optional...',
+    successTitle: 'Thank you!', successMsg: 'Your availability has been submitted successfully.',
+    required: 'This field is required', invalidEmail: 'Please enter a valid email',
+    noQuestions: 'No additional questions for this program.',
+    selectOption: 'Select an option...',
   },
   he: {
     title: 'טופס הרשמה',
-    step1: 'פרטים אישיים',
-    step2: 'שאלות',
-    step3: 'זמינות',
-    fullName: 'שם מלא',
-    email: 'אימייל',
-    phone: 'טלפון (אופציונלי)',
-    school: 'שם בית הספר',
-    city: 'עיר',
-    country: 'מדינה',
-    grade: 'כיתה',
-    gender: 'מגדר',
-    genderMale: 'זכר',
-    genderFemale: 'נקבה',
-    genderNoChoice: 'מעדיפ/ה לא לציין',
-    hobbies: 'תחביבים',
-    englishLevel: 'רמת אנגלית',
-    hebrewLevel: 'רמת עברית',
-    selectEnglishLevel: 'בחר/י רמה...',
-    selectHebrewLevel: 'בחר/י רמה...',
-    timezone: 'אזור הזמן שלך',
-    timezoneSearch: 'חפש אזור זמן...',
-    priorityTz: 'אזורי זמן נפוצים',
-    allTz: 'כל אזורי הזמן',
-    next: 'הבא',
-    back: 'חזרה',
-    submit: 'שלח',
-    submitting: 'שולח...',
+    step1: 'פרטים אישיים', step2: 'שאלות', step3: 'זמינות',
+    fullName: 'שם מלא', email: 'אימייל', phone: 'טלפון (אופציונלי)',
+    school: 'שם בית הספר', city: 'עיר', country: 'מדינה',
+    timezone: 'אזור הזמן שלך', timezoneSearch: 'חפש אזור זמן...',
+    priorityTz: 'אזורי זמן נפוצים', allTz: 'כל אזורי הזמן',
+    next: 'הבא', back: 'חזרה', submit: 'שלח', submitting: 'שולח...',
     availTitle: 'בחר את הזמינות שלך',
     availSubtitle: 'לחץ על משבצות בהן אתה פנוי (30 דקות, 06:00–23:00)',
     slotsSelected: 'משבצות נבחרו',
-    successTitle: 'תודה!',
-    successMsg: 'הזמינות שלך נשלחה בהצלחה.',
-    required: 'שדה זה הוא חובה',
-    invalidEmail: 'נא להזין כתובת אימייל תקינה',
-    podcastLangQuestion: 'באיזה שפה את/ה מעדיפ/ה להקליט את הפודקאסט?',
-    competitionGoalQuestion: 'כמה חשוב לי לנצח בתחרות?',
-    additionalInfo: 'עוד משהו שאת/ה חושב/ת חשוב שנדע?',
-    additionalInfoPlaceholder: 'אופציונלי...',
+    successTitle: 'תודה!', successMsg: 'הזמינות שלך נשלחה בהצלחה.',
+    required: 'שדה זה הוא חובה', invalidEmail: 'נא להזין כתובת אימייל תקינה',
+    noQuestions: 'אין שאלות נוספות לתוכנית זו.',
+    selectOption: 'בחר אפשרות...',
   },
   es: {
     title: 'Formulario de Registro',
-    step1: 'Información Personal',
-    step2: 'Preguntas',
-    step3: 'Disponibilidad',
-    fullName: 'Nombre Completo',
-    email: 'Correo Electrónico',
-    phone: 'Teléfono (opcional)',
-    school: 'Nombre de la Escuela',
-    city: 'Ciudad',
-    country: 'País',
-    grade: 'Grado',
-    gender: 'Género',
-    genderMale: 'Masculino',
-    genderFemale: 'Femenino',
-    genderNoChoice: 'Prefiero no decirlo',
-    hobbies: 'Pasatiempos',
-    englishLevel: 'Nivel de Inglés',
-    hebrewLevel: 'Nivel de Hebreo',
-    selectEnglishLevel: 'Selecciona tu nivel...',
-    selectHebrewLevel: 'Selecciona tu nivel...',
-    timezone: 'Tu Zona Horaria',
-    timezoneSearch: 'Buscar zona horaria...',
-    priorityTz: 'Zonas Horarias Comunes',
-    allTz: 'Todas las Zonas Horarias',
-    next: 'Siguiente',
-    back: 'Atrás',
-    submit: 'Enviar',
-    submitting: 'Enviando...',
+    step1: 'Información Personal', step2: 'Preguntas', step3: 'Disponibilidad',
+    fullName: 'Nombre Completo', email: 'Correo Electrónico', phone: 'Teléfono (opcional)',
+    school: 'Nombre de la Escuela', city: 'Ciudad', country: 'País',
+    timezone: 'Tu Zona Horaria', timezoneSearch: 'Buscar zona horaria...',
+    priorityTz: 'Zonas Horarias Comunes', allTz: 'Todas las Zonas Horarias',
+    next: 'Siguiente', back: 'Atrás', submit: 'Enviar', submitting: 'Enviando...',
     availTitle: 'Selecciona tu Disponibilidad',
     availSubtitle: 'Haz clic en los bloques cuando estés disponible (30 minutos, 6:00–23:00)',
     slotsSelected: 'bloques seleccionados',
-    successTitle: '¡Gracias!',
-    successMsg: 'Tu disponibilidad se ha enviado correctamente.',
-    required: 'Este campo es obligatorio',
-    invalidEmail: 'Por favor ingresa un correo válido',
-    podcastLangQuestion: '¿En qué idioma preferirías grabar el podcast?',
-    competitionGoalQuestion: '¿Qué tan importante es ganar la competencia para ti?',
-    additionalInfo: '¿Algo más que creas que es importante que sepamos?',
-    additionalInfoPlaceholder: 'Opcional...',
+    successTitle: '¡Gracias!', successMsg: 'Tu disponibilidad se ha enviado correctamente.',
+    required: 'Este campo es obligatorio', invalidEmail: 'Por favor ingresa un correo válido',
+    noQuestions: 'No hay preguntas adicionales para este programa.',
+    selectOption: 'Selecciona una opción...',
   },
 }
-
-const DAYS = 14
 
 export default function FormPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
@@ -242,28 +84,20 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   const [tzSearch, setTzSearch] = useState('')
   const [schoolList, setSchoolList] = useState<string[]>([])
   const [schoolOther, setSchoolOther] = useState(false)
+  const [fieldDefs, setFieldDefs] = useState<FieldDef[]>([])
 
   const t = T[lang]
   const isRtl = lang === 'he'
 
+  // Fixed core fields
   const [form, setForm] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    schoolName: '',
-    city: '',
-    country: '',
-    grade: '',
-    gender: '',
-    hobbies: '',
-    englishLevel: '',
-    hebrewLevel: '',
-    podcastLanguage: '',
-    competitionGoal: '',
-    additionalInfo: '',
-    confirmedTz: '',
-    detectedTz: '',
+    fullName: '', email: '', phone: '',
+    schoolName: '', city: '', country: '',
+    confirmedTz: '', detectedTz: '',
   })
+
+  // Dynamic custom field values: fieldKey → value
+  const [customValues, setCustomValues] = useState<Record<string, string>>({})
 
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set())
 
@@ -273,28 +107,41 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   }, [])
 
   useEffect(() => {
-    fetch('/api/schools').then(r => r.json()).then((data: { name: string }[]) => setSchoolList(data.map(s => s.name))).catch(() => {})
+    fetch('/api/schools')
+      .then(r => r.json())
+      .then((data: { name: string }[]) => setSchoolList(data.map(s => s.name)))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/fields')
+      .then(r => r.json())
+      .then((data: FieldDef[]) => setFieldDefs(data))
+      .catch(() => {})
   }, [])
 
   function validateStep1() {
-    const newErrors: Record<string, string> = {}
-    if (!form.fullName.trim()) newErrors.fullName = t.required
-    if (!form.email.trim()) newErrors.email = t.required
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = t.invalidEmail
-    if (!form.schoolName.trim()) newErrors.schoolName = t.required
-    if (!form.city.trim()) newErrors.city = t.required
-    if (!form.country.trim()) newErrors.country = t.required
-    if (!form.confirmedTz) newErrors.confirmedTz = t.required
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const e: Record<string, string> = {}
+    if (!form.fullName.trim()) e.fullName = t.required
+    if (!form.email.trim()) e.email = t.required
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = t.invalidEmail
+    if (!form.schoolName.trim()) e.schoolName = t.required
+    if (!form.city.trim()) e.city = t.required
+    if (!form.country.trim()) e.country = t.required
+    if (!form.confirmedTz) e.confirmedTz = t.required
+    setErrors(e)
+    return Object.keys(e).length === 0
   }
 
   function validateStep2() {
-    const newErrors: Record<string, string> = {}
-    if (!form.podcastLanguage) newErrors.podcastLanguage = t.required
-    if (!form.competitionGoal) newErrors.competitionGoal = t.required
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const e: Record<string, string> = {}
+    for (const f of fieldDefs) {
+      if (f.isRequired && !customValues[f.fieldKey]?.trim()) {
+        e[f.fieldKey] = t.required
+      }
+    }
+    setErrors(e)
+    return Object.keys(e).length === 0
   }
 
   function handleNext() {
@@ -303,10 +150,9 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   }
 
   function toggleSlot(slotKey: string) {
-    setSelectedSlots((prev) => {
+    setSelectedSlots(prev => {
       const next = new Set(prev)
-      if (next.has(slotKey)) next.delete(slotKey)
-      else next.add(slotKey)
+      next.has(slotKey) ? next.delete(slotKey) : next.add(slotKey)
       return next
     })
   }
@@ -316,33 +162,104 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     try {
       const availability = Array.from(selectedSlots).map((key) => {
         const [dayStr, timeStr] = key.split('_')
-        const dayOfWeek = parseInt(dayStr)
-        const h = timeStr.slice(0, 2)
-        const m = timeStr.slice(2, 4)
+        const h = timeStr.slice(0, 2), m = timeStr.slice(2, 4)
         const startTime = `${h}:${m}`
         const endMins = parseInt(m) + 30
         const endTime = endMins === 60
           ? `${String(parseInt(h) + 1).padStart(2, '0')}:00`
           : `${h}:${String(endMins).padStart(2, '0')}`
-        return { dayOfWeek, startTime, endTime }
+        return { dayOfWeek: parseInt(dayStr), startTime, endTime }
       })
 
-      const res = await fetch('/api/participants', {
+      // Build customFields map: fieldId → value
+      const customFields: Record<string, string> = {}
+      for (const fd of fieldDefs) {
+        if (customValues[fd.fieldKey] !== undefined) {
+          customFields[fd.id] = customValues[fd.fieldKey]
+        }
+      }
+
+      await fetch('/api/participants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, token, availability }),
+        body: JSON.stringify({ ...form, token, availability, customFields }),
       })
-
-      if (res.ok) setSubmitted(true)
+      setSubmitted(true)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const filteredTz = ALL_TIMEZONES.filter((tz) =>
+  const filteredTz = ALL_TIMEZONES.filter(tz =>
     tz.label.toLowerCase().includes(tzSearch.toLowerCase())
   ).slice(0, 100)
 
+  // ── Dynamic field renderer ──────────────────────────────────────────────
+  function renderField(fd: FieldDef) {
+    const val = customValues[fd.fieldKey] ?? ''
+    const err = errors[fd.fieldKey]
+    const base = `w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${err ? 'border-red-400' : 'border-gray-300'}`
+
+    const set = (v: string) => setCustomValues(prev => ({ ...prev, [fd.fieldKey]: v }))
+
+    if (fd.fieldType === 'SELECT') {
+      return (
+        <div key={fd.id}>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+          <select className={base + ' bg-white'} value={val} onChange={e => set(e.target.value)}>
+            <option value="">{t.selectOption}</option>
+            {fd.options.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          {err && <p className="text-red-500 text-xs mt-1">{err}</p>}
+        </div>
+      )
+    }
+
+    if (fd.fieldType === 'MULTISELECT') {
+      const selected = val ? val.split(',').map(s => s.trim()) : []
+      const toggle = (o: string) => {
+        const next = selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]
+        set(next.join(', '))
+      }
+      return (
+        <div key={fd.id}>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+          <div className="flex flex-wrap gap-2">
+            {fd.options.map(o => (
+              <button key={o} type="button" onClick={() => toggle(o)}
+                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${selected.includes(o) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
+                {o}
+              </button>
+            ))}
+          </div>
+          {err && <p className="text-red-500 text-xs mt-1">{err}</p>}
+        </div>
+      )
+    }
+
+    if (fd.fieldType === 'NUMBER') {
+      return (
+        <div key={fd.id}>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+          <input type="number" className={base} value={val} placeholder={fd.placeholder ?? ''}
+            onChange={e => set(e.target.value)} />
+          {err && <p className="text-red-500 text-xs mt-1">{err}</p>}
+        </div>
+      )
+    }
+
+    // TEXT (default)
+    return (
+      <div key={fd.id}>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+        <input className={base} value={val} placeholder={fd.placeholder ?? ''}
+          onChange={e => set(e.target.value)} />
+        {err && <p className="text-red-500 text-xs mt-1">{err}</p>}
+      </div>
+    )
+  }
+
+  // ── Submitted ───────────────────────────────────────────────────────────
   if (submitted) {
     return (
       <div className={`min-h-screen bg-gray-50 flex items-center justify-center p-4 ${isRtl ? 'rtl' : 'ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
@@ -359,17 +276,15 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     )
   }
 
+  // ── Form ────────────────────────────────────────────────────────────────
   return (
     <div className={`min-h-screen bg-gray-50 ${isRtl ? 'rtl' : 'ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Language switcher */}
         <div className={`flex gap-2 mb-6 ${isRtl ? 'justify-start' : 'justify-end'}`}>
           {(['en', 'he', 'es'] as Lang[]).map((l) => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${lang === l ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-400'}`}
-            >
+            <button key={l} onClick={() => setLang(l)}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${lang === l ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-400'}`}>
               {l === 'en' ? 'English' : l === 'he' ? 'עברית' : 'Español'}
             </button>
           ))}
@@ -382,9 +297,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
             <div className="flex gap-2 items-center">
               {[1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
-                    {s}
-                  </div>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>{s}</div>
                   <span className={`text-sm ${step >= s ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
                     {s === 1 ? t.step1 : s === 2 ? t.step2 : t.step3}
                   </span>
@@ -395,41 +308,27 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
           </div>
 
           <div className="p-6">
-            {/* Step 1: Personal Info */}
+            {/* ── Step 1: Personal Info ── */}
             {step === 1 && (
               <div className="space-y-4">
-                {/* Full Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.fullName} *</label>
-                  <input
-                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.fullName ? 'border-red-400' : 'border-gray-300'}`}
-                    value={form.fullName}
-                    onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                  />
+                  <input className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.fullName ? 'border-red-400' : 'border-gray-300'}`}
+                    value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} />
                   {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>}
                 </div>
 
-                {/* Email */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.email} *</label>
-                  <input
-                    type="email"
-                    className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-400' : 'border-gray-300'}`}
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
+                  <input type="email" className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-400' : 'border-gray-300'}`}
+                    value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                 </div>
 
-                {/* Phone */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.phone}</label>
-                  <input
-                    type="tel"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  />
+                  <input type="tel" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                 </div>
 
                 {/* School */}
@@ -437,128 +336,40 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.school} *</label>
                   {schoolList.length > 0 ? (
                     <>
-                      <select
-                        className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
+                      <select className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
                         value={schoolOther ? '__other__' : form.schoolName}
-                        onChange={(e) => {
+                        onChange={e => {
                           if (e.target.value === '__other__') { setSchoolOther(true); setForm({ ...form, schoolName: '' }) }
                           else { setSchoolOther(false); setForm({ ...form, schoolName: e.target.value }) }
-                        }}
-                      >
+                        }}>
                         <option value="">— Select school —</option>
-                        {schoolList.map((s) => <option key={s} value={s}>{s}</option>)}
+                        {schoolList.map(s => <option key={s} value={s}>{s}</option>)}
                         <option value="__other__">Other...</option>
                       </select>
                       {schoolOther && (
-                        <input
-                          className={`mt-2 w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
-                          placeholder="Enter school name"
-                          value={form.schoolName}
-                          onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
-                        />
+                        <input className={`mt-2 w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
+                          placeholder="Enter school name" value={form.schoolName}
+                          onChange={e => setForm({ ...form, schoolName: e.target.value })} />
                       )}
                     </>
                   ) : (
-                    <input
-                      className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
-                      value={form.schoolName}
-                      onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
-                    />
+                    <input className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
+                      value={form.schoolName} onChange={e => setForm({ ...form, schoolName: e.target.value })} />
                   )}
                   {errors.schoolName && <p className="text-red-500 text-xs mt-1">{errors.schoolName}</p>}
                 </div>
 
-                {/* Grade */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.grade}</label>
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.grade}
-                    onChange={(e) => setForm({ ...form, grade: e.target.value })}
-                  />
-                </div>
-
-                {/* Gender */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.gender}</label>
-                  <div className="flex gap-3">
-                    {[
-                      { value: 'male', label: t.genderMale },
-                      { value: 'female', label: t.genderFemale },
-                      { value: 'no_choice', label: t.genderNoChoice },
-                    ].map((opt) => (
-                      <label key={opt.value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${form.gender === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                        <input type="radio" name="gender" value={opt.value}
-                          checked={form.gender === opt.value}
-                          onChange={(e) => setForm({ ...form, gender: e.target.value })}
-                          className="accent-blue-600" />
-                        {opt.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Hobbies */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.hobbies}</label>
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.hobbies}
-                    onChange={(e) => setForm({ ...form, hobbies: e.target.value })}
-                  />
-                </div>
-
-                {/* English Level (Israel) / Hebrew Level (abroad) */}
-                {form.country.toLowerCase().includes('israel') || form.country === 'ישראל' ? (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.englishLevel}</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                      value={form.englishLevel}
-                      onChange={(e) => setForm({ ...form, englishLevel: e.target.value })}
-                    >
-                      <option value="">{t.selectEnglishLevel}</option>
-                      {ENGLISH_LEVELS[lang].map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : form.country ? (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.hebrewLevel}</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                      value={form.hebrewLevel}
-                      onChange={(e) => setForm({ ...form, hebrewLevel: e.target.value })}
-                    >
-                      <option value="">{t.selectHebrewLevel}</option>
-                      {HEBREW_LEVELS[lang].map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-
                 <div className="grid grid-cols-2 gap-3">
-                  {/* City */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t.city} *</label>
-                    <input
-                      className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city ? 'border-red-400' : 'border-gray-300'}`}
-                      value={form.city}
-                      onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    />
+                    <input className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city ? 'border-red-400' : 'border-gray-300'}`}
+                      value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
                     {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
                   </div>
-
-                  {/* Country */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t.country} *</label>
-                    <input
-                      className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.country ? 'border-red-400' : 'border-gray-300'}`}
-                      value={form.country}
-                      onChange={(e) => setForm({ ...form, country: e.target.value })}
-                    />
+                    <input className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.country ? 'border-red-400' : 'border-gray-300'}`}
+                      value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
                     {errors.country && <p className="text-red-500 text-xs mt-1">{errors.country}</p>}
                   </div>
                 </div>
@@ -570,13 +381,9 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                     <div className="bg-blue-50 p-2 border-b border-gray-200">
                       <p className="text-xs font-medium text-blue-700 px-1 mb-1">{t.priorityTz}</p>
                       <div className="grid grid-cols-1 gap-1">
-                        {PRIORITY_TIMEZONES.map((tz) => (
-                          <button
-                            key={tz.value}
-                            type="button"
-                            onClick={() => setForm({ ...form, confirmedTz: tz.value })}
-                            className={`text-left px-3 py-1.5 rounded text-sm transition-colors ${form.confirmedTz === tz.value ? 'bg-blue-600 text-white' : 'hover:bg-blue-100 text-gray-700'}`}
-                          >
+                        {PRIORITY_TIMEZONES.map(tz => (
+                          <button key={tz.value} type="button" onClick={() => setForm({ ...form, confirmedTz: tz.value })}
+                            className={`text-left px-3 py-1.5 rounded text-sm transition-colors ${form.confirmedTz === tz.value ? 'bg-blue-600 text-white' : 'hover:bg-blue-100 text-gray-700'}`}>
                             {tz.label}
                           </button>
                         ))}
@@ -584,186 +391,88 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                     </div>
                     <div className="p-2">
                       <p className="text-xs font-medium text-gray-600 px-1 mb-1">{t.allTz}</p>
-                      <input
-                        className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder={t.timezoneSearch}
-                        value={tzSearch}
-                        onChange={(e) => setTzSearch(e.target.value)}
-                      />
+                      <input className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder={t.timezoneSearch} value={tzSearch} onChange={e => setTzSearch(e.target.value)} />
                       <div className="max-h-40 overflow-y-auto space-y-0.5">
-                        {filteredTz.map((tz) => (
-                          <button
-                            key={tz.value}
-                            type="button"
-                            onClick={() => setForm({ ...form, confirmedTz: tz.value })}
-                            className={`w-full text-left px-3 py-1 rounded text-sm transition-colors ${form.confirmedTz === tz.value ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
-                          >
+                        {filteredTz.map(tz => (
+                          <button key={tz.value} type="button" onClick={() => setForm({ ...form, confirmedTz: tz.value })}
+                            className={`w-full text-left px-3 py-1 rounded text-sm transition-colors ${form.confirmedTz === tz.value ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'}`}>
                             {tz.label}
                           </button>
                         ))}
                       </div>
                     </div>
                   </div>
-                  {form.confirmedTz && (
-                    <p className="text-xs text-green-600 mt-1">✓ {form.confirmedTz}</p>
-                  )}
+                  {form.confirmedTz && <p className="text-xs text-green-600 mt-1">✓ {form.confirmedTz}</p>}
                   {errors.confirmedTz && <p className="text-red-500 text-xs mt-1">{errors.confirmedTz}</p>}
                 </div>
 
-                <button
-                  onClick={handleNext}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors"
-                >
+                <button onClick={handleNext} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
                   {t.next} →
                 </button>
               </div>
             )}
 
-            {/* Step 2: Questions */}
+            {/* ── Step 2: Dynamic Questions ── */}
             {step === 2 && (
               <div className="space-y-6">
-                {/* Podcast Language */}
-                <div>
-                  <p className="text-sm font-medium text-gray-800 mb-3">{t.podcastLangQuestion} *</p>
-                  <div className="space-y-2">
-                    {PODCAST_LANGUAGE_OPTIONS[lang].map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form.podcastLanguage === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                      >
-                        <input
-                          type="radio"
-                          name="podcastLanguage"
-                          value={opt.value}
-                          checked={form.podcastLanguage === opt.value}
-                          onChange={(e) => setForm({ ...form, podcastLanguage: e.target.value })}
-                          className="accent-blue-600"
-                        />
-                        <span className="text-sm text-gray-700">{opt.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {errors.podcastLanguage && <p className="text-red-500 text-xs mt-1">{errors.podcastLanguage}</p>}
-                </div>
-
-                {/* Competition Goal */}
-                <div>
-                  <p className="text-sm font-medium text-gray-800 mb-3">{t.competitionGoalQuestion} *</p>
-                  <div className="space-y-2">
-                    {COMPETITION_GOAL_OPTIONS[lang].map((opt) => (
-                      <label
-                        key={opt.value}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form.competitionGoal === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                      >
-                        <input
-                          type="radio"
-                          name="competitionGoal"
-                          value={opt.value}
-                          checked={form.competitionGoal === opt.value}
-                          onChange={(e) => setForm({ ...form, competitionGoal: e.target.value })}
-                          className="accent-blue-600"
-                        />
-                        <span className="text-sm text-gray-700">{opt.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {errors.competitionGoal && <p className="text-red-500 text-xs mt-1">{errors.competitionGoal}</p>}
-                </div>
-
-                {/* Additional Info */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.additionalInfo}</label>
-                  <textarea
-                    rows={3}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                    placeholder={t.additionalInfoPlaceholder}
-                    value={form.additionalInfo}
-                    onChange={(e) => setForm({ ...form, additionalInfo: e.target.value })}
-                  />
-                </div>
-
+                {fieldDefs.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">{t.noQuestions}</p>
+                ) : (
+                  fieldDefs.map(fd => renderField(fd))
+                )}
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => { setErrors({}); setStep(1) }}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition-colors"
-                  >
+                  <button onClick={() => { setErrors({}); setStep(1) }}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition-colors">
                     ← {t.back}
                   </button>
-                  <button
-                    onClick={handleNext}
-                    className="flex-grow bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors"
-                  >
+                  <button onClick={handleNext}
+                    className="flex-grow bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
                     {t.next} →
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 3: Availability */}
+            {/* ── Step 3: Availability ── */}
             {step === 3 && (
               <div>
-                <h2 className="font-semibold text-gray-900 mb-1">{t.availTitle}</h2>
-                <p className="text-sm text-gray-500 mb-4">{t.availSubtitle}</p>
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-sm px-3 py-1 rounded-full">
-                    <span className="font-bold">{selectedSlots.size}</span> {t.slotsSelected}
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto -mx-6 px-6">
-                  <div className="min-w-max">
-                    {/* Header row */}
-                    <div className="flex">
-                      <div className="w-14 shrink-0" />
-                      {DAY_LABELS[lang].map((dayLabel, dayIndex) => (
-                        <div key={dayIndex} className="w-14 text-center shrink-0">
-                          <div className="text-xs font-medium text-gray-700 py-1">{dayLabel}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Time slots */}
-                    {(() => {
-                      const timeLabels: string[] = []
-                      for (let h = 6; h < 23; h++) {
-                        for (const m of [0, 30]) {
-                          if (h === 22 && m === 30) continue
-                          timeLabels.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
-                        }
-                      }
-                      return timeLabels.map((time) => (
-                        <div key={time} className="flex">
-                          <div className="w-14 shrink-0 text-xs text-gray-400 flex items-center">{time}</div>
-                          {DAY_LABELS[lang].map((_, dayIndex) => {
-                            const [h, m] = time.split(':').map(Number)
-                            const slotKey = `${dayIndex}_${String(h).padStart(2, '0')}${String(m).padStart(2, '0')}`
-                            const selected = selectedSlots.has(slotKey)
-                            return (
-                              <div
-                                key={dayIndex}
-                                onClick={() => toggleSlot(slotKey)}
-                                className={`w-14 h-6 shrink-0 border border-gray-100 cursor-pointer transition-colors ${selected ? 'bg-blue-500' : 'bg-white hover:bg-blue-50'}`}
-                              />
-                            )
-                          })}
-                        </div>
-                      ))
-                    })()}
+                <p className="text-sm font-medium text-gray-700 mb-1">{t.availTitle}</p>
+                <p className="text-xs text-gray-400 mb-4">{t.availSubtitle}</p>
+                <p className="text-xs text-blue-600 mb-4">{selectedSlots.size} {t.slotsSelected}</p>
+                <div className="overflow-x-auto">
+                  <div className="grid grid-cols-8 gap-0.5 min-w-max">
+                    <div />
+                    {DAY_LABELS[lang].map((d, i) => (
+                      <div key={i} className="text-xs font-medium text-gray-600 text-center pb-2">{d}</div>
+                    ))}
+                    {Array.from({ length: (23 - 6) * 2 }, (_, idx) => {
+                      const totalMins = 6 * 60 + idx * 30
+                      const h = Math.floor(totalMins / 60)
+                      const m = totalMins % 60
+                      const timeLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+                      const timeKey = `${String(h).padStart(2, '0')}${String(m).padStart(2, '0')}`
+                      return [
+                        <div key={`label-${idx}`} className="text-xs text-gray-400 text-right pr-2 py-1 w-14">{timeLabel}</div>,
+                        ...[0, 1, 2, 3, 4, 5, 6].map((day) => {
+                          const slotKey = `${day}_${timeKey}`
+                          const active = selectedSlots.has(slotKey)
+                          return (
+                            <button key={slotKey} type="button" onClick={() => toggleSlot(slotKey)}
+                              className={`h-7 w-full rounded-sm transition-colors border ${active ? 'bg-blue-500 border-blue-600' : 'bg-gray-50 border-gray-200 hover:bg-blue-100'}`} />
+                          )
+                        }),
+                      ]
+                    }).flat()}
                   </div>
                 </div>
-
                 <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => setStep(2)}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition-colors"
-                  >
+                  <button onClick={() => { setErrors({}); setStep(2) }}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition-colors">
                     ← {t.back}
                   </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="flex-2 flex-grow bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2.5 rounded-lg transition-colors"
-                  >
+                  <button onClick={handleSubmit} disabled={submitting}
+                    className="flex-grow bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2.5 rounded-lg transition-colors">
                     {submitting ? t.submitting : t.submit}
                   </button>
                 </div>

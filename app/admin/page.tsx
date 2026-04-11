@@ -49,9 +49,13 @@ interface CustomField {
   fieldKey: string
   fieldType: FieldType
   options: string[]
+  placeholder?: string
   isRequired: boolean
   isActive: boolean
   sortOrder: number
+  matchingMode: 'OFF' | 'PREFERRED' | 'MANDATORY'
+  matchingType: 'SAME_VALUE' | 'DIFFERENT_VALUE' | 'NUMERIC_GAP' | 'ANY_VALUE'
+  matchingWeight: number
 }
 
 interface MatchMember {
@@ -113,30 +117,14 @@ export default function AdminDashboard() {
   // Calendar popup
   const [calendarPopup, setCalendarPopup] = useState<{ participant: Participant; x: number; y: number } | null>(null)
 
-  // Country group state
-  const [countryGroupA, setCountryGroupA] = useState<string[]>([])
-  const [countryGroupRule, setCountryGroupRule] = useState<'any' | 'A_with_B' | 'A_with_A' | 'B_with_B'>('any')
-  const [matchResult, setMatchResult] = useState<{ matchesCreated: number; unmatchedCount: number; unmatched: { id: string; fullName: string; schoolName: string; country: string; warnings: string[] }[] } | null>(null)
+  const [matchResult, setMatchResult] = useState<{ matchesCreated: number; unmatchedCount: number; unmatched: { id: string; fullName: string; schoolName: string; country: string; warnings: string[]; blockers: string[] }[] } | null>(null)
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({})
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null)
 
   type RuleMode = 'mandatory' | 'preferred' | 'off'
-  const [rules, setRules] = useState<Record<string, RuleMode>>({
-    availability: 'mandatory',
-    differentSchool: 'off',
-    differentCountry: 'off',
-    sameEnglishLevel: 'off',
-    similarHobbies: 'off',
-    samePodcastLanguage: 'off',
-    sameCompetitionGoal: 'off',
-    sameGrade: 'off',
-    sameGender: 'off',
-  })
-  const [gradeGap, setGradeGap] = useState<0 | 1 | 2>(0)
-
-  function setRule(key: string, mode: RuleMode) {
-    setRules((r) => ({ ...r, [key]: mode }))
-  }
+  const [availabilityRule, setAvailabilityRule] = useState<RuleMode>('mandatory')
+  const [differentSchoolRule, setDifferentSchoolRule] = useState<RuleMode>('off')
+  const [differentCountryRule, setDifferentCountryRule] = useState<RuleMode>('off')
 
   // Custom field form
   const [showAddField, setShowAddField] = useState(false)
@@ -210,7 +198,8 @@ export default function AdminDashboard() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        matchType, groupSize, rules, countryGroupA, countryGroupRule, gradeGap,
+        matchType, groupSize,
+        availabilityRule, differentSchoolRule, differentCountryRule,
         countrySideA: countrySideA.length > 0 ? countrySideA : undefined,
         countrySideB: countrySideB.length > 0 ? countrySideB : undefined,
         schoolSideA: schoolSideA.length > 0 ? schoolSideA : undefined,
@@ -252,12 +241,6 @@ export default function AdminDashboard() {
     fetchMatches()
   }
 
-  function toggleCountryA(country: string) {
-    setCountryGroupA((prev) =>
-      prev.includes(country) ? prev.filter((c) => c !== country) : [...prev, country]
-    )
-  }
-
   async function toggleField(id: string, isActive: boolean) {
     await fetch(`/api/admin/custom-fields/${id}`, {
       method: 'PATCH',
@@ -270,6 +253,15 @@ export default function AdminDashboard() {
   async function deleteField(id: string) {
     if (!confirm('Delete this field?')) return
     await fetch(`/api/admin/custom-fields/${id}`, { method: 'DELETE' })
+    fetchCustomFields()
+  }
+
+  async function updateFieldMatching(id: string, patch: Partial<{ matchingMode: string; matchingType: string; matchingWeight: number }>) {
+    await fetch(`/api/admin/custom-fields/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
     fetchCustomFields()
   }
 
@@ -313,33 +305,16 @@ export default function AdminDashboard() {
     else cons.push('אותו בית ספר')
     if (a.country !== b.country) pros.push(`מדינות שונות: ${a.country} / ${b.country}`)
     else cons.push(`אותה מדינה: ${a.country}`)
-    if (a.englishLevel && b.englishLevel) {
-      if (a.englishLevel === b.englishLevel) pros.push(`רמת אנגלית זהה: ${a.englishLevel}`)
-      else cons.push(`רמת אנגלית שונה: ${a.englishLevel} / ${b.englishLevel}`)
-    }
-    if (a.hobbies && b.hobbies) {
-      const setA = new Set(a.hobbies.toLowerCase().split(',').map(h => h.trim()))
-      const shared = b.hobbies.toLowerCase().split(',').map(h => h.trim()).filter(h => setA.has(h))
-      if (shared.length > 0) pros.push(`תחביבים משותפים: ${shared.join(', ')}`)
-      else cons.push('אין תחביבים משותפים')
-    }
-    if (a.podcastLanguage && b.podcastLanguage) {
-      if (a.podcastLanguage === b.podcastLanguage) pros.push(`העדפת שפה זהה: ${a.podcastLanguage}`)
-      else cons.push(`העדפת שפה שונה: ${a.podcastLanguage} / ${b.podcastLanguage}`)
-    }
-    if (a.competitionGoal && b.competitionGoal) {
-      if (a.competitionGoal === b.competitionGoal) pros.push(`מטרת תחרות זהה`)
-      else cons.push(`מטרת תחרות שונה: ${a.competitionGoal} / ${b.competitionGoal}`)
-    }
-    if (a.grade && b.grade) {
-      const gap = Math.abs((parseInt(a.grade) || 0) - (parseInt(b.grade) || 0))
-      if (gap === 0) pros.push(`אותה כיתה: ${a.grade}`)
-      else if (gap === 1) cons.push(`פער כיתה: ${a.grade} / ${b.grade}`)
-      else cons.push(`פער כיתות: ${a.grade} / ${b.grade}`)
-    }
-    if (a.gender && b.gender && a.gender !== 'no_choice' && b.gender !== 'no_choice') {
-      if (a.gender === b.gender) pros.push(`אותו מגדר: ${a.gender}`)
-      else cons.push(`מגדרים שונים: ${a.gender} / ${b.gender}`)
+    // Dynamic custom fields
+    const aMap = Object.fromEntries((a.customFields || []).map((cf) => [cf.field.label, cf.value]))
+    const bMap = Object.fromEntries((b.customFields || []).map((cf) => [cf.field.label, cf.value]))
+    const labels = new Set([...(a.customFields || []).map((cf) => cf.field.label), ...(b.customFields || []).map((cf) => cf.field.label)])
+    for (const label of labels) {
+      const va = aMap[label]
+      const vb = bMap[label]
+      if (!va && !vb) continue
+      if (va && vb && va === vb) pros.push(`${label}: ${va}`)
+      else if (va && vb) cons.push(`${label}: ${va} / ${vb}`)
     }
     return { pros, cons }
   }
@@ -798,27 +773,57 @@ export default function AdminDashboard() {
 
             <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
               {customFields.map((field) => (
-                <div key={field.id} className="flex items-center justify-between px-4 py-3">
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">{field.label}</div>
-                    <div className="text-xs text-gray-400">{field.fieldKey} · {field.fieldType}{field.isRequired ? ' · Required' : ''}</div>
-                    {field.options.length > 0 && (
-                      <div className="text-xs text-gray-400">{field.options.join(', ')}</div>
-                    )}
+                <div key={field.id} className="px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900 text-sm">{field.label}</div>
+                      <div className="text-xs text-gray-400">{field.fieldKey} · {field.fieldType}{field.isRequired ? ' · Required' : ''}</div>
+                      {field.options.length > 0 && (
+                        <div className="text-xs text-gray-400">{field.options.join(', ')}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => toggleField(field.id, !field.isActive)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${field.isActive ? 'bg-blue-600' : 'bg-gray-200'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${field.isActive ? 'translate-x-4' : 'translate-x-1'}`} />
+                      </button>
+                      <button onClick={() => deleteField(field.id)} className="text-red-500 hover:text-red-700 text-sm">Delete</button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => toggleField(field.id, !field.isActive)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${field.isActive ? 'bg-blue-600' : 'bg-gray-200'}`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${field.isActive ? 'translate-x-4' : 'translate-x-1'}`} />
-                    </button>
-                    <button
-                      onClick={() => deleteField(field.id)}
-                      className="text-red-500 hover:text-red-700 text-sm"
-                    >
-                      Delete
-                    </button>
+                  {/* Matching config */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-xs text-gray-500 w-16 shrink-0">Matching:</span>
+                    {(['OFF', 'PREFERRED', 'MANDATORY'] as const).map((mode) => (
+                      <button key={mode} onClick={() => updateFieldMatching(field.id, { matchingMode: mode })}
+                        className={`px-2.5 py-0.5 rounded text-xs font-medium border transition-colors ${field.matchingMode === mode
+                          ? mode === 'MANDATORY' ? 'bg-red-500 text-white border-red-500'
+                          : mode === 'PREFERRED' ? 'bg-yellow-400 text-white border-yellow-400'
+                          : 'bg-gray-200 text-gray-600 border-gray-300'
+                          : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>
+                        {mode}
+                      </button>
+                    ))}
+                    {field.matchingMode !== 'OFF' && (
+                      <>
+                        <span className="text-xs text-gray-400 ml-2">Compare:</span>
+                        {(['SAME_VALUE', 'DIFFERENT_VALUE', 'NUMERIC_GAP', 'ANY_VALUE'] as const).map((type) => (
+                          <button key={type} onClick={() => updateFieldMatching(field.id, { matchingType: type })}
+                            className={`px-2 py-0.5 rounded text-xs border transition-colors ${field.matchingType === type ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}>
+                            {type === 'SAME_VALUE' ? 'Same' : type === 'DIFFERENT_VALUE' ? 'Different' : type === 'NUMERIC_GAP' ? 'Numeric gap' : 'Any value'}
+                          </button>
+                        ))}
+                        {field.matchingMode === 'PREFERRED' && (
+                          <label className="flex items-center gap-1.5 ml-2 text-xs text-gray-500">
+                            Weight:
+                            <input type="number" min={1} max={20} value={field.matchingWeight}
+                              onChange={(e) => updateFieldMatching(field.id, { matchingWeight: Number(e.target.value) })}
+                              className="w-14 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                          </label>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -933,77 +938,31 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Country Groups */}
-              {uniqueCountries.length > 0 && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700 block mb-2">כללי שיבוץ לפי מדינה</label>
-                  <div className="border border-gray-200 rounded-lg p-3 space-y-3">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-2">בחר מדינות לקבוצה A (למשל: ישראל)</p>
-                      <div className="flex flex-wrap gap-2">
-                        {uniqueCountries.map((c) => (
-                          <button key={c} onClick={() => toggleCountryA(c)}
-                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${countryGroupA.includes(c) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
-                            {c}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {countryGroupA.length > 0 && (
-                      <div>
-                        <p className="text-xs text-gray-500 mb-2">כלל שיבוץ בין הקבוצות</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { value: 'A_with_B', label: 'A + B בלבד (ישראל עם חו"ל)' },
-                            { value: 'A_with_A', label: 'A + A בלבד' },
-                            { value: 'B_with_B', label: 'B + B בלבד' },
-                            { value: 'any', label: 'ללא הגבלה' },
-                          ].map((opt) => (
-                            <label key={opt.value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${countryGroupRule === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                              <input type="radio" name="groupRule" value={opt.value}
-                                checked={countryGroupRule === opt.value}
-                                onChange={(e) => setCountryGroupRule(e.target.value as typeof countryGroupRule)} />
-                              {opt.label}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Matching Rules */}
+              {/* Built-in Matching Rules */}
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-3">Matching Rules</label>
+                <label className="text-sm font-medium text-gray-700 block mb-1">Built-in Rules</label>
+                <p className="text-xs text-gray-400 mb-3">כללי שדות מותאמים אישית מוגדרים בטאב Custom Fields.</p>
                 <div className="text-xs text-gray-400 flex gap-4 mb-2 px-1">
-                  <span className="w-48">Rule</span>
+                  <span className="w-52">Rule</span>
                   <span className="w-24 text-center">Off</span>
                   <span className="w-24 text-center text-yellow-600">Preferred</span>
                   <span className="w-24 text-center text-red-600">Mandatory</span>
                 </div>
                 <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
                   {[
-                    { key: 'availability', label: 'Overlapping availability', desc: 'Must have a common free slot' },
-                    { key: 'differentSchool', label: 'Different schools', desc: 'Participants from different schools' },
-                    { key: 'differentCountry', label: 'Different countries', desc: 'Participants from different countries' },
-                    { key: 'sameEnglishLevel', label: 'Same English level', desc: 'Similar English proficiency' },
-                    { key: 'similarHobbies', label: 'Similar hobbies', desc: 'At least one hobby in common' },
-                    { key: 'samePodcastLanguage', label: 'Same podcast language preference', desc: 'Agree on recording language' },
-                    { key: 'sameCompetitionGoal', label: 'Same competition goal', desc: 'Similar motivation (win/experience/etc.)' },
-                    { key: 'sameGrade', label: 'Same grade', desc: rules.sameGrade === 'off' ? 'Same school grade/year' : `Max gap: ${gradeGap === 0 ? 'exact' : `±${gradeGap}`}` },
-                    { key: 'sameGender', label: 'Same gender', desc: 'Participants with the same gender (ignores "no preference")' },
-                  ].map(({ key, label, desc }) => (
+                    { key: 'availability', label: 'Overlapping availability', desc: 'Must have a common free slot', value: availabilityRule, set: setAvailabilityRule },
+                    { key: 'differentSchool', label: 'Different schools', desc: 'Participants from different schools', value: differentSchoolRule, set: setDifferentSchoolRule },
+                    { key: 'differentCountry', label: 'Different countries', desc: 'Participants from different countries', value: differentCountryRule, set: setDifferentCountryRule },
+                  ].map(({ key, label, desc, value, set }) => (
                     <div key={key} className="flex items-center px-3 py-2.5 gap-4">
-                      <div className="w-48">
+                      <div className="w-52">
                         <div className="text-sm text-gray-800">{label}</div>
                         <div className="text-xs text-gray-400">{desc}</div>
                       </div>
                       {(['off', 'preferred', 'mandatory'] as const).map((mode) => (
-                        <button key={mode}
-                          onClick={() => setRule(key, mode)}
+                        <button key={mode} onClick={() => set(mode)}
                           className={`w-24 py-1 rounded text-xs font-medium border transition-colors ${
-                            rules[key] === mode
+                            value === mode
                               ? mode === 'mandatory' ? 'bg-red-500 text-white border-red-500'
                               : mode === 'preferred' ? 'bg-yellow-400 text-white border-yellow-400'
                               : 'bg-gray-200 text-gray-600 border-gray-200'
@@ -1017,15 +976,17 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {rules.sameGrade !== 'off' && (
-                <div className="border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Grade gap allowed</p>
-                  <div className="flex gap-2">
-                    {([0, 1, 2] as const).map((gap) => (
-                      <button key={gap} onClick={() => setGradeGap(gap)}
-                        className={`px-4 py-1.5 rounded-lg text-sm border transition-colors ${gradeGap === gap ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}>
-                        {gap === 0 ? 'Exact (±0)' : `±${gap} grade${gap > 1 ? 's' : ''}`}
-                      </button>
+              {/* Summary of active custom field rules */}
+              {customFields.some((f) => f.matchingMode !== 'OFF') && (
+                <div className="border border-blue-100 bg-blue-50 rounded-lg px-4 py-3">
+                  <p className="text-xs font-medium text-blue-700 mb-2">כללי שדות פעילים (מוגדרים בטאב Custom Fields)</p>
+                  <div className="space-y-1">
+                    {customFields.filter((f) => f.matchingMode !== 'OFF').map((f) => (
+                      <div key={f.id} className="flex items-center gap-2 text-xs text-blue-800">
+                        <span className={`px-1.5 py-0.5 rounded font-medium ${f.matchingMode === 'MANDATORY' ? 'bg-red-500 text-white' : 'bg-yellow-400 text-white'}`}>{f.matchingMode}</span>
+                        <span>{f.label}</span>
+                        <span className="text-blue-400">· {f.matchingType}{f.matchingMode === 'PREFERRED' ? ` · weight ${f.matchingWeight}` : ''}</span>
+                      </div>
                     ))}
                   </div>
                 </div>

@@ -12,14 +12,6 @@ export async function POST(request: NextRequest) {
       schoolName,
       city,
       country,
-      grade,
-      gender,
-      hobbies,
-      englishLevel,
-      hebrewLevel,
-      podcastLanguage,
-      competitionGoal,
-      additionalInfo,
       detectedTz,
       confirmedTz,
       availability,
@@ -35,50 +27,24 @@ export async function POST(request: NextRequest) {
       participant = await prisma.participant.findUnique({ where: { submissionToken: token } })
     }
 
+    const coreData = {
+      fullName,
+      email,
+      phone: phone || null,
+      schoolName,
+      city,
+      country,
+      detectedTz: detectedTz || confirmedTz,
+      confirmedTz,
+    }
+
     if (participant) {
       participant = await prisma.participant.update({
         where: { submissionToken: token },
-        data: {
-          fullName,
-          email,
-          phone: phone || null,
-          schoolName,
-          city,
-          country,
-          grade: grade || null,
-          gender: gender || null,
-          hobbies: hobbies || null,
-          englishLevel: englishLevel || null,
-          hebrewLevel: hebrewLevel || null,
-          podcastLanguage: podcastLanguage || null,
-          competitionGoal: competitionGoal || null,
-          additionalInfo: additionalInfo || null,
-          detectedTz: detectedTz || confirmedTz,
-          confirmedTz,
-          status: 'PENDING',
-        },
+        data: { ...coreData, status: 'PENDING' },
       })
     } else {
-      participant = await prisma.participant.create({
-        data: {
-          fullName,
-          email,
-          phone: phone || null,
-          schoolName,
-          city,
-          country,
-          grade: grade || null,
-          gender: gender || null,
-          hobbies: hobbies || null,
-          englishLevel: englishLevel || null,
-          hebrewLevel: hebrewLevel || null,
-          podcastLanguage: podcastLanguage || null,
-          competitionGoal: competitionGoal || null,
-          additionalInfo: additionalInfo || null,
-          detectedTz: detectedTz || confirmedTz,
-          confirmedTz,
-        },
-      })
+      participant = await prisma.participant.create({ data: coreData })
     }
 
     if (availability && Array.isArray(availability)) {
@@ -97,6 +63,7 @@ export async function POST(request: NextRequest) {
 
     if (customFields && typeof customFields === 'object') {
       for (const [fieldId, value] of Object.entries(customFields)) {
+        if (value === '' || value === null || value === undefined) continue
         await prisma.customFieldResponse.upsert({
           where: { participantId_fieldId: { participantId: participant.id, fieldId } },
           create: { participantId: participant.id, fieldId, value: String(value) },

@@ -84,7 +84,7 @@ const PALETTE = [
 function utcToIst(utcIso: string) {
   return DateTime.fromISO(utcIso, { zone: 'utc' })
     .setZone('Asia/Jerusalem')
-    .toFormat('dd MMM HH:mm')
+    .toFormat('cccc, dd MMM HH:mm')
 }
 
 export default function AdminDashboard() {
@@ -1095,7 +1095,7 @@ export default function AdminDashboard() {
                             <div>
                               <p className="text-xs font-semibold text-gray-500 uppercase mb-1">תאריך ושעה (שעון ישראל)</p>
                               <p className="text-sm text-gray-800 font-medium">
-                                {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')}
+                                {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')} IST
                               </p>
                             </div>
 

@@ -348,15 +348,17 @@ export async function POST(request: NextRequest) {
 
         tryGroup([unmatchedForGroup[i]], seedOverlap)
 
-        if (bestGroup && bestGroup.length === size) {
-          const startUtc = bestOverlap ? nextOccurrence(bestOverlap.dayOfWeek, bestOverlap.startTime) : new Date()
+        const resolvedGroup = bestGroup as ParticipantData[] | null
+        const resolvedOverlap = bestOverlap as ReturnType<typeof findAvailabilityOverlap>
+        if (resolvedGroup && resolvedGroup.length === size) {
+          const startUtc = resolvedOverlap ? nextOccurrence(resolvedOverlap.dayOfWeek, resolvedOverlap.startTime) : new Date()
           const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
 
           const groupNotes: string[] = []
-          const countries = [...new Set((bestGroup as ParticipantData[]).map((p) => p.country))]
-          const schools = [...new Set((bestGroup as ParticipantData[]).map((p) => p.schoolName))]
+          const countries = [...new Set(resolvedGroup.map((p) => p.country))]
+          const schools = [...new Set(resolvedGroup.map((p) => p.schoolName))]
           if (countries.length === 1) groupNotes.push(`All participants from ${countries[0]}`)
-          if (schools.length < (bestGroup as ParticipantData[]).length) groupNotes.push('Duplicate school in group')
+          if (schools.length < resolvedGroup.length) groupNotes.push('Duplicate school in group')
 
           const match = await prisma.match.create({
             data: {
@@ -364,11 +366,11 @@ export async function POST(request: NextRequest) {
               scheduledStartUtc: startUtc,
               scheduledEndUtc: endUtc,
               systemNotes: groupNotes.join(' | ') || null,
-              members: { create: (bestGroup as ParticipantData[]).map((p) => ({ participantId: p.id })) },
+              members: { create: resolvedGroup.map((p) => ({ participantId: p.id })) },
             },
           })
           createdMatches.push(match.id)
-          ;(bestGroup as ParticipantData[]).forEach((p) => groupMatched.add(p.id))
+          resolvedGroup.forEach((p) => groupMatched.add(p.id))
         }
       }
     }

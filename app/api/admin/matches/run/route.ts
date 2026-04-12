@@ -145,8 +145,8 @@ function generateSystemNotes(
 ): string {
   const notes: string[] = []
 
-  if (a.schoolName === b.schoolName) notes.push(`אותו בית ספר: ${a.schoolName}`)
-  if (a.country === b.country && differentCountryRule === 'preferred') notes.push(`אותה מדינה: ${a.country}`)
+  if (a.schoolName === b.schoolName) notes.push(`Same school: ${a.schoolName}`)
+  if (a.country === b.country && differentCountryRule === 'preferred') notes.push(`Same country: ${a.country}`)
 
   for (const fd of fieldDefs) {
     if (fd.matchingMode === 'OFF') continue
@@ -387,27 +387,27 @@ export async function POST(request: NextRequest) {
         const others = eligible.filter((q) => q.id !== p.id && !matchedParticipantIds.has(q.id))
 
         if (others.length === 0) {
-          blockers.push('אין משתתפים פנויים אחרים לשיבוץ')
+          blockers.push('No other available participants to match with')
         } else {
           const sameSchoolOnly = others.every((q) => q.schoolName === p.schoolName)
           if (others.filter((q) => q.schoolName === p.schoolName).length === others.length && others.length > 0) {
-            warnings.push(`כל המשתתפים הפנויים מאותו בית ספר (${p.schoolName})`)
+            warnings.push(`All available participants are from the same school (${p.schoolName})`)
           }
           if (others.filter((q) => q.country === p.country).length === others.length && others.length > 0) {
-            warnings.push(`כל המשתתפים הפנויים מאותה מדינה (${p.country})`)
+            warnings.push(`All available participants are from the same country (${p.country})`)
           }
 
           const hasOverlap = others.some((q) =>
             findAvailabilityOverlap(p.availability, p.confirmedTz, q.availability, q.confirmedTz),
           )
           if (!hasOverlap && availabilityRule === 'mandatory') {
-            blockers.push('אין חפיפת זמנים עם אף משתתף אחר — שנה כלל זמינות ל-Off/Preferred')
+            blockers.push('No availability overlap with any other participant — change availability rule to Off/Preferred')
           }
           if (differentSchoolRule === 'mandatory' && sameSchoolOnly) {
-            blockers.push('כולם מאותו בית ספר — שנה כלל בית ספר')
+            blockers.push('All others are from the same school — change school rule')
           }
           if (differentCountryRule === 'mandatory' && others.every((q) => q.country === p.country)) {
-            blockers.push('כולם מאותה מדינה — שנה כלל מדינה')
+            blockers.push('All others are from the same country — change country rule')
           }
 
           for (const fd of fieldDefs) {
@@ -417,7 +417,7 @@ export async function POST(request: NextRequest) {
               fieldMatches(pVal, q.customValues[fd.id], fd.fieldType, fd.matchingType, fd.matchingWeight),
             )
             if (!hasFieldMatch) {
-              blockers.push(`אין התאמה בשדה "${fd.label}" (${pVal ?? 'ריק'}) — שנה הגדרת שדה ל-Preferred`)
+              blockers.push(`No match for field "${fd.label}" (value: ${pVal ?? 'empty'}) — change field to Preferred`)
             }
           }
         }

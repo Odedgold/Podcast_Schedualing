@@ -328,10 +328,10 @@ export default function AdminDashboard() {
   function computeProsAndCons(a: Participant, b: Participant) {
     const pros: string[] = []
     const cons: string[] = []
-    if (a.schoolName !== b.schoolName) pros.push('בתי ספר שונים')
-    else cons.push('אותו בית ספר')
-    if (a.country !== b.country) pros.push(`מדינות שונות: ${a.country} / ${b.country}`)
-    else cons.push(`אותה מדינה: ${a.country}`)
+    if (a.schoolName !== b.schoolName) pros.push('Different schools')
+    else cons.push(`Same school: ${a.schoolName}`)
+    if (a.country !== b.country) pros.push(`Different countries: ${a.country} / ${b.country}`)
+    else cons.push(`Same country: ${a.country}`)
     // Dynamic custom fields
     const aMap = Object.fromEntries((a.customFields || []).map((cf) => [cf.field.label, cf.value]))
     const bMap = Object.fromEntries((b.customFields || []).map((cf) => [cf.field.label, cf.value]))
@@ -346,7 +346,7 @@ export default function AdminDashboard() {
     return { pros, cons }
   }
 
-  const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   async function addSchool() {
     if (!newSchoolName.trim()) return
@@ -756,19 +756,25 @@ export default function AdminDashboard() {
                       <button onClick={() => setCalendarPopup(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
                     </div>
                     <div className="space-y-1 text-xs text-gray-600">
-                      <div className="flex gap-1"><span className="text-gray-400 w-16">בית ספר</span><span>{calendarPopup.participant.schoolName}</span></div>
-                      <div className="flex gap-1"><span className="text-gray-400 w-16">מדינה</span><span>{calendarPopup.participant.country}</span></div>
-                      <div className="flex gap-1"><span className="text-gray-400 w-16">עיר</span><span>{calendarPopup.participant.city}</span></div>
-                      {calendarPopup.participant.grade && <div className="flex gap-1"><span className="text-gray-400 w-16">כיתה</span><span>{calendarPopup.participant.grade}</span></div>}
-                      {calendarPopup.participant.gender && calendarPopup.participant.gender !== 'no_choice' && (
-                        <div className="flex gap-1"><span className="text-gray-400 w-16">מגדר</span><span>{calendarPopup.participant.gender === 'male' ? 'זכר' : 'נקבה'}</span></div>
-                      )}
-                      <div className="flex gap-1"><span className="text-gray-400 w-16">סטטוס</span>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">School</span><span>{calendarPopup.participant.schoolName}</span></div>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">Country</span><span>{calendarPopup.participant.country}</span></div>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">City</span><span>{calendarPopup.participant.city}</span></div>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">Status</span>
                         <span className={`px-1.5 rounded-full text-[10px] font-medium ${calendarPopup.participant.status === 'MATCHED' ? 'bg-green-100 text-green-700' : calendarPopup.participant.status === 'INACTIVE' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
                           {calendarPopup.participant.status}
                         </span>
                       </div>
-                      <div className="flex gap-1"><span className="text-gray-400 w-16">זמינויות</span><span>{calendarPopup.participant.availability.length} סלוטים</span></div>
+                      <div className="flex gap-1"><span className="text-gray-400 w-16">Slots</span><span>{calendarPopup.participant.availability.length} slots</span></div>
+                      {calendarPopup.participant.customFields?.length > 0 && (
+                        <div className="pt-1 border-t border-gray-100 space-y-0.5">
+                          {calendarPopup.participant.customFields.map((cf) => (
+                            <div key={cf.field.label} className="flex gap-1">
+                              <span className="text-gray-400 w-16 shrink-0 truncate">{cf.field.label}</span>
+                              <span>{cf.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -957,23 +963,22 @@ export default function AdminDashboard() {
 
               {/* Population selection: Side A vs Side B */}
               <div className="space-y-4">
-                <p className="text-sm text-gray-500">בחר אוכלוסיות לשיבוץ — צד A מול צד B. אם לא בוחרים כלום, כל המשתתפים נכנסים.</p>
+                <p className="text-sm text-gray-500">Select populations for matching — Side A vs Side B. If nothing is selected, all participants are included.</p>
 
                 {/* Countries */}
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 block mb-2">מדינות</label>
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">Countries</label>
                   <div className="grid grid-cols-2 gap-3">
                     {(['A', 'B'] as const).map((side) => {
                       const selected = side === 'A' ? countrySideA : countrySideB
                       const setSelected = side === 'A' ? setCountrySideA : setCountrySideB
-                      const color = side === 'A' ? 'blue' : 'orange'
                       return (
                         <div key={side} className={`border-2 rounded-xl p-3 ${side === 'A' ? 'border-blue-200 bg-blue-50/40' : 'border-orange-200 bg-orange-50/40'}`}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${side === 'A' ? 'bg-blue-600 text-white' : 'bg-orange-500 text-white'}`}>צד {side}</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${side === 'A' ? 'bg-blue-600 text-white' : 'bg-orange-500 text-white'}`}>Side {side}</span>
                             <div className="flex gap-2">
-                              <button onClick={() => setSelected([...uniqueCountries])} className="text-xs text-gray-500 hover:underline">הכל</button>
-                              <button onClick={() => setSelected([])} className="text-xs text-gray-400 hover:underline">נקה</button>
+                              <button onClick={() => setSelected([...uniqueCountries])} className="text-xs text-gray-500 hover:underline">All</button>
+                              <button onClick={() => setSelected([])} className="text-xs text-gray-400 hover:underline">Clear</button>
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-1.5">
@@ -986,7 +991,7 @@ export default function AdminDashboard() {
                               </button>
                             ))}
                           </div>
-                          {selected.length === 0 && <p className="text-xs text-gray-400 mt-2 italic">כל המדינות</p>}
+                          {selected.length === 0 && <p className="text-xs text-gray-400 mt-2 italic">All countries</p>}
                         </div>
                       )
                     })}
@@ -995,7 +1000,7 @@ export default function AdminDashboard() {
 
                 {/* Schools */}
                 <div>
-                  <label className="text-sm font-semibold text-gray-700 block mb-2">בתי ספר</label>
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">Schools</label>
                   <div className="grid grid-cols-2 gap-3">
                     {(['A', 'B'] as const).map((side) => {
                       const selected = side === 'A' ? schoolSideA : schoolSideB
@@ -1003,10 +1008,10 @@ export default function AdminDashboard() {
                       return (
                         <div key={side} className={`border-2 rounded-xl p-3 ${side === 'A' ? 'border-blue-200 bg-blue-50/40' : 'border-orange-200 bg-orange-50/40'}`}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${side === 'A' ? 'bg-blue-600 text-white' : 'bg-orange-500 text-white'}`}>צד {side}</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${side === 'A' ? 'bg-blue-600 text-white' : 'bg-orange-500 text-white'}`}>Side {side}</span>
                             <div className="flex gap-2">
-                              <button onClick={() => setSelected([...uniqueSchools])} className="text-xs text-gray-500 hover:underline">הכל</button>
-                              <button onClick={() => setSelected([])} className="text-xs text-gray-400 hover:underline">נקה</button>
+                              <button onClick={() => setSelected([...uniqueSchools])} className="text-xs text-gray-500 hover:underline">All</button>
+                              <button onClick={() => setSelected([])} className="text-xs text-gray-400 hover:underline">Clear</button>
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-1.5">
@@ -1019,7 +1024,7 @@ export default function AdminDashboard() {
                               </button>
                             ))}
                           </div>
-                          {selected.length === 0 && <p className="text-xs text-gray-400 mt-2 italic">כל בתי הספר</p>}
+                          {selected.length === 0 && <p className="text-xs text-gray-400 mt-2 italic">All schools</p>}
                         </div>
                       )
                     })}

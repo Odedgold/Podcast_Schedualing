@@ -6,8 +6,7 @@ export async function GET(_request: NextRequest) {
     const participants = await prisma.participant.findMany({
       include: {
         availability: { orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] },
-        customFields: { include: { field: true } },
-        matchMembers: { include: { match: true } },
+        customFields: { include: { field: { select: { label: true } } } },
       },
       orderBy: { submittedAt: 'desc' },
     })

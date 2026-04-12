@@ -226,7 +226,7 @@ export default function AdminDashboard() {
   }
 
   async function breakMatch(id: string) {
-    if (!confirm('לפרק את השיבוץ ולהחזיר משתתפים לפול?')) return
+    if (!confirm('Break this match and return participants to the pool?')) return
     await fetch(`/api/admin/matches/${id}/break`, { method: 'POST' })
     fetchMatches()
     fetchParticipants()
@@ -1006,11 +1006,11 @@ export default function AdminDashboard() {
               {matchResult && (
                 <div className="space-y-2">
                   <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
-                    ✓ נוצרו <strong>{matchResult.matchesCreated}</strong> שיבוצים. בדוק בטאב Matches Review.
+                    ✓ Created <strong>{matchResult.matchesCreated}</strong> matches. Check the Matches Review tab.
                   </div>
                   {matchResult.unmatchedCount > 0 && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
-                      <p className="font-medium mb-2">⚠️ {matchResult.unmatchedCount} משתתפים לא שובצו</p>
+                      <p className="font-medium mb-2">⚠️ {matchResult.unmatchedCount} participants could not be matched</p>
                       <div className="space-y-2">
                         {matchResult.unmatched.map((u: { id: string; fullName: string; schoolName: string; country: string; warnings: string[]; blockers: string[] }) => (
                           <div key={u.id} className="bg-white border border-yellow-200 rounded-lg px-3 py-2 text-xs">
@@ -1082,9 +1082,9 @@ export default function AdminDashboard() {
                             {match.systemNotes && <span className="text-yellow-500 text-xs">⚠️</span>}
                           </button>
                           <div className="flex gap-2 shrink-0">
-                            <button onClick={() => approveMatch(match.id)} className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg">אשר</button>
-                            <button onClick={() => rejectMatch(match.id)} className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg">דחה</button>
-                            <button onClick={() => breakMatch(match.id)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg">פרק</button>
+                            <button onClick={() => approveMatch(match.id)} className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg">Approve</button>
+                            <button onClick={() => rejectMatch(match.id)} className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg">Reject</button>
+                            <button onClick={() => breakMatch(match.id)} className="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg">Break</button>
                           </div>
                         </div>
 
@@ -1093,7 +1093,7 @@ export default function AdminDashboard() {
                           <div className="border-t border-gray-100 px-4 py-3 space-y-4 bg-gray-50">
                             {/* Date & Time */}
                             <div>
-                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">תאריך ושעה (שעון ישראל)</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Date & Time (Israel time)</p>
                               <p className="text-sm text-gray-800 font-medium">
                                 {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')} IST
                               </p>
@@ -1144,11 +1144,11 @@ export default function AdminDashboard() {
                               const { pros, cons } = computeProsAndCons(pa, pb)
                               return (
                                 <div>
-                                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">יתרונות וחסרונות</p>
+                                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Pros & Cons</p>
                                   <div className="grid grid-cols-2 gap-2">
                                     <div className="space-y-1">
-                                      <p className="text-xs font-medium text-green-700 mb-1">יתרונות</p>
-                                      {pros.length === 0 && <p className="text-xs text-gray-400 italic">אין</p>}
+                                      <p className="text-xs font-medium text-green-700 mb-1">Pros</p>
+                                      {pros.length === 0 && <p className="text-xs text-gray-400 italic">None</p>}
                                       {pros.map((pro, i) => (
                                         <div key={i} className="flex items-start gap-1 text-xs text-green-800 bg-green-50 border border-green-200 rounded px-2 py-1">
                                           <span className="shrink-0">✓</span><span>{pro}</span>
@@ -1156,8 +1156,8 @@ export default function AdminDashboard() {
                                       ))}
                                     </div>
                                     <div className="space-y-1">
-                                      <p className="text-xs font-medium text-red-700 mb-1">חסרונות</p>
-                                      {cons.length === 0 && <p className="text-xs text-gray-400 italic">אין</p>}
+                                      <p className="text-xs font-medium text-red-700 mb-1">Cons</p>
+                                      {cons.length === 0 && <p className="text-xs text-gray-400 italic">None</p>}
                                       {cons.map((con, i) => (
                                         <div key={i} className="flex items-start gap-1 text-xs text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
                                           <span className="shrink-0">✗</span><span>{con}</span>
@@ -1172,7 +1172,7 @@ export default function AdminDashboard() {
                             {/* System Notes */}
                             {match.systemNotes && (
                               <div>
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">התראות מערכת</p>
+                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">System Warnings</p>
                                 <div className="space-y-1">
                                   {match.systemNotes.split(' | ').map((note, i) => (
                                     <div key={i} className="flex items-start gap-1.5 text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
@@ -1185,15 +1185,15 @@ export default function AdminDashboard() {
 
                             {/* Admin Notes */}
                             <div>
-                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">הערה ידנית</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Admin Notes</p>
                               <div className="flex gap-2">
                                 <input
                                   className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                  placeholder="הוסף הערה..."
+                                  placeholder="Add a note..."
                                   value={editingNotes[match.id] ?? match.adminNotes ?? ''}
                                   onChange={(e) => setEditingNotes((n) => ({ ...n, [match.id]: e.target.value }))}
                                 />
-                                <button onClick={() => saveNotes(match.id)} className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">שמור</button>
+                                <button onClick={() => saveNotes(match.id)} className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">Save</button>
                               </div>
                             </div>
                           </div>

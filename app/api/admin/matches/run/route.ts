@@ -284,34 +284,78 @@ export async function POST(request: NextRequest) {
 
     if (matchType === 'GROUP' || matchType === 'BOTH') {
       const size = groupSize || 3
-      const unmatched = eligible.filter((p) => !createdMatches.includes(p.id))
+      const unmatchedForGroup = eligible.filter((p) => !matched.has(p.id))
 
-      for (let i = 0; i + size <= unmatched.length; i += size) {
-        const group = unmatched.slice(i, i + size)
-        let commonOverlap: ReturnType<typeof findAvailabilityOverlap> = group[0].availability.length > 0
-          ? (() => {
-              const u = slotToUtc(group[0].availability[0], group[0].confirmedTz)
-              return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
-            })()
-          : null
+      // Find best group by trying all combinations of `size` participants
+      const groupMatched = new Set<string>()
 
-        for (let g = 1; g < group.length && commonOverlap; g++) {
-          const utcSlotsG = group[g].availability.map((s) => {
-            const u = slotToUtc(s, group[g].confirmedTz)
-            return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
-          })
-          commonOverlap = findAvailabilityOverlap([commonOverlap], 'UTC', utcSlotsG, 'UTC')
+      // Greedy: pick best-scoring group starting from each unmatched participant
+      for (let i = 0; i < unmatchedForGroup.length; i++) {
+        if (groupMatched.has(unmatchedForGroup[i].id)) continue
+
+        // Find all others that share a UTC overlap with participant i
+        const candidates: { p: ParticipantData; overlap: NonNullable<ReturnType<typeof findAvailabilityOverlap>> }[] = []
+        for (let j = 0; j < unmatchedForGroup.length; j++) {
+          if (j === i || groupMatched.has(unmatchedForGroup[j].id)) continue
+          const ov = findAvailabilityOverlap(
+            unmatchedForGroup[i].availability, unmatchedForGroup[i].confirmedTz,
+            unmatchedForGroup[j].availability, unmatchedForGroup[j].confirmedTz,
+          )
+          if (ov) candidates.push({ p: unmatchedForGroup[j], overlap: ov })
         }
 
-        if (commonOverlap || availabilityRule !== 'mandatory') {
-          const startUtc = commonOverlap ? nextOccurrence(commonOverlap.dayOfWeek, commonOverlap.startTime) : new Date()
+        if (candidates.length < size - 1) continue
+
+        // Try to extend: find a common overlap among i + first (size-1) candidates
+        // Pick the first viable combination
+        let bestGroup: ParticipantData[] | null = null
+        let bestOverlap: ReturnType<typeof findAvailabilityOverlap> = null
+
+        const tryGroup = (members: ParticipantData[], currentOverlap: ReturnType<typeof findAvailabilityOverlap>) => {
+          if (members.length === size) { bestGroup = members; bestOverlap = currentOverlap; return }
+          for (const cand of candidates) {
+            if (members.includes(cand.p)) continue
+            // Narrow current overlap against this candidate's UTC slots
+            const utcSlots = cand.p.availability.map((s) => {
+              const u = slotToUtc(s, cand.p.confirmedTz)
+              return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
+            })
+            const newOverlap = currentOverlap
+              ? findAvailabilityOverlap([currentOverlap], 'UTC', utcSlots, 'UTC')
+              : findAvailabilityOverlap(cand.p.availability, cand.p.confirmedTz, members[0].availability, members[0].confirmedTz)
+            if (newOverlap || availabilityRule !== 'mandatory') {
+              tryGroup([...members, cand.p], newOverlap)
+              if (bestGroup) return
+            }
+          }
+        }
+
+        // Seed overlap: convert first participant's slots to UTC pseudo-slots
+        const seedUtcSlots = unmatchedForGroup[i].availability.map((s) => {
+          const u = slotToUtc(s, unmatchedForGroup[i].confirmedTz)
+          return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
+        })
+        // Find overlap between seed and first candidate to start with
+        let seedOverlap: ReturnType<typeof findAvailabilityOverlap> = null
+        if (candidates.length > 0) {
+          const firstCandUtc = candidates[0].p.availability.map((s) => {
+            const u = slotToUtc(s, candidates[0].p.confirmedTz)
+            return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
+          })
+          seedOverlap = findAvailabilityOverlap(seedUtcSlots, 'UTC', firstCandUtc, 'UTC')
+        }
+
+        tryGroup([unmatchedForGroup[i]], seedOverlap)
+
+        if (bestGroup && bestGroup.length === size) {
+          const startUtc = bestOverlap ? nextOccurrence(bestOverlap.dayOfWeek, bestOverlap.startTime) : new Date()
           const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
 
           const groupNotes: string[] = []
-          const countries = [...new Set(group.map((p) => p.country))]
-          const schools = [...new Set(group.map((p) => p.schoolName))]
-          if (countries.length === 1) groupNotes.push(`כל המשתתפים מ-${countries[0]}`)
-          if (schools.length < group.length) groupNotes.push('יש בית ספר כפול בקבוצה')
+          const countries = [...new Set((bestGroup as ParticipantData[]).map((p) => p.country))]
+          const schools = [...new Set((bestGroup as ParticipantData[]).map((p) => p.schoolName))]
+          if (countries.length === 1) groupNotes.push(`All participants from ${countries[0]}`)
+          if (schools.length < (bestGroup as ParticipantData[]).length) groupNotes.push('Duplicate school in group')
 
           const match = await prisma.match.create({
             data: {
@@ -319,10 +363,11 @@ export async function POST(request: NextRequest) {
               scheduledStartUtc: startUtc,
               scheduledEndUtc: endUtc,
               systemNotes: groupNotes.join(' | ') || null,
-              members: { create: group.map((p) => ({ participantId: p.id })) },
+              members: { create: (bestGroup as ParticipantData[]).map((p) => ({ participantId: p.id })) },
             },
           })
           createdMatches.push(match.id)
+          ;(bestGroup as ParticipantData[]).forEach((p) => groupMatched.add(p.id))
         }
       }
     }

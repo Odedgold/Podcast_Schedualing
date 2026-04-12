@@ -389,7 +389,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">Scheduling & Matching Platform</h1>
         <div className="flex gap-3">
           <a href="/admin/generate-link" className="text-sm text-blue-600 hover:underline">
@@ -402,7 +402,7 @@ export default function AdminDashboard() {
       </header>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200 px-6">
+      <div className="sticky top-[65px] z-20 bg-white border-b border-gray-200 px-6">
         <div className="flex gap-6">
           {(['participants', 'fields', 'matching', 'matches', 'schools'] as const).map((t) => (
             <button
@@ -1101,24 +1101,35 @@ export default function AdminDashboard() {
 
                             {/* Participants details + availability */}
                             <div>
-                              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">משתתפים וזמינות</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Participants & Availability</p>
                               <div className="grid grid-cols-1 gap-2">
                                 {match.members.map((mm) => {
                                   const p = mm.participant as Participant & { availability: AvailabilitySlot[] }
+                                  // Compute participant's local time for the match
+                                  const matchLocal = DateTime.fromISO(match.scheduledStartUtc, { zone: 'utc' }).setZone(p.confirmedTz)
+                                  const matchEndLocal = DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone(p.confirmedTz)
+                                  const matchLocalStr = `${matchLocal.toFormat('cccc, dd MMM HH:mm')} – ${matchEndLocal.toFormat('HH:mm')}`
                                   return (
                                     <div key={mm.role + p.id} className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700">
-                                      <div className="font-semibold text-gray-900 mb-1">{p.fullName} <span className="font-normal text-gray-400">· {p.schoolName} · {p.country}</span></div>
-                                      <div className="text-gray-400 mb-1.5">{p.confirmedTz}</div>
+                                      <div className="font-semibold text-gray-900 mb-0.5">{p.fullName} <span className="font-normal text-gray-400">· {p.schoolName} · {p.country}</span></div>
+                                      <div className="text-gray-400 mb-0.5">{p.confirmedTz}</div>
+                                      <div className="text-green-700 font-medium mb-1.5">📅 {matchLocalStr} (local)</div>
                                       {p.availability && p.availability.length > 0 ? (
                                         <div className="flex flex-wrap gap-1">
-                                          {p.availability.map((slot) => (
-                                            <span key={slot.id} className="bg-blue-50 border border-blue-200 text-blue-700 rounded px-1.5 py-0.5 text-[11px]">
-                                              {DAY_NAMES[slot.dayOfWeek]} {slot.startTime}–{slot.endTime}
-                                            </span>
-                                          ))}
+                                          {p.availability.map((slot) => {
+                                            const isMatch = slot.dayOfWeek === matchLocal.weekday % 7 &&
+                                              slot.startTime <= matchLocal.toFormat('HH:mm') &&
+                                              slot.endTime >= matchEndLocal.toFormat('HH:mm')
+                                            return (
+                                              <span key={slot.id} className={`rounded px-1.5 py-0.5 text-[11px] border ${isMatch ? 'bg-green-100 border-green-400 text-green-800 font-semibold' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                                                {DAY_NAMES[slot.dayOfWeek]} {slot.startTime}–{slot.endTime}
+                                                {isMatch && ' ✓'}
+                                              </span>
+                                            )
+                                          })}
                                         </div>
                                       ) : (
-                                        <span className="text-gray-400 italic">אין זמינות רשומה</span>
+                                        <span className="text-gray-400 italic">No availability recorded</span>
                                       )}
                                     </div>
                                   )

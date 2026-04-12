@@ -35,8 +35,10 @@ function minutesToTime(mins: number): string {
 function slotToUtc(slot: WeeklySlot, tz: string): UtcSlot {
   const [sh, sm] = slot.startTime.split(':').map(Number)
   const [eh, em] = slot.endTime.split(':').map(Number)
-  const base = DateTime.fromObject({ year: 2024, month: 1, day: 7 + slot.dayOfWeek, hour: sh, minute: sm, second: 0 }, { zone: tz }).toUTC()
-  const baseEnd = DateTime.fromObject({ year: 2024, month: 1, day: 7 + slot.dayOfWeek, hour: eh, minute: em, second: 0 }, { zone: tz }).toUTC()
+  // Use current year/month so DST offset matches the actual scheduling period
+  const now = DateTime.now()
+  const base = DateTime.fromObject({ year: now.year, month: now.month, day: 7 + slot.dayOfWeek, hour: sh, minute: sm, second: 0 }, { zone: tz }).toUTC()
+  const baseEnd = DateTime.fromObject({ year: now.year, month: now.month, day: 7 + slot.dayOfWeek, hour: eh, minute: em, second: 0 }, { zone: tz }).toUTC()
   const utcDay = base.weekday === 7 ? 0 : base.weekday
   return { dayOfWeek: utcDay, startMinutes: base.hour * 60 + base.minute, endMinutes: baseEnd.hour * 60 + baseEnd.minute }
 }

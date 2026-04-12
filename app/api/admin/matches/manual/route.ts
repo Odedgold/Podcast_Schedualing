@@ -19,8 +19,9 @@ function nextOccurrence(utcDayOfWeek: number, utcTimeStr: string): Date {
 function slotToUtcMinutes(slot: { dayOfWeek: number; startTime: string; endTime: string }, tz: string) {
   const [sh, sm] = slot.startTime.split(':').map(Number)
   const [eh, em] = slot.endTime.split(':').map(Number)
-  const base = DateTime.fromObject({ year: 2024, month: 1, day: 7 + slot.dayOfWeek, hour: sh, minute: sm }, { zone: tz }).toUTC()
-  const baseEnd = DateTime.fromObject({ year: 2024, month: 1, day: 7 + slot.dayOfWeek, hour: eh, minute: em }, { zone: tz }).toUTC()
+  const now = DateTime.now()
+  const base = DateTime.fromObject({ year: now.year, month: now.month, day: 7 + slot.dayOfWeek, hour: sh, minute: sm }, { zone: tz }).toUTC()
+  const baseEnd = DateTime.fromObject({ year: now.year, month: now.month, day: 7 + slot.dayOfWeek, hour: eh, minute: em }, { zone: tz }).toUTC()
   const utcDay = base.weekday === 7 ? 0 : base.weekday
   return { dayOfWeek: utcDay, startMin: base.hour * 60 + base.minute, endMin: baseEnd.hour * 60 + baseEnd.minute }
 }

@@ -227,9 +227,10 @@ export async function POST(request: NextRequest) {
       }))
 
     const createdMatches: string[] = []
+    const matchedParticipantIds = new Set<string>()
 
     if (matchType === 'PAIR' || matchType === 'BOTH') {
-      const matched = new Set<string>()
+      const matched = matchedParticipantIds
 
       for (let i = 0; i < eligible.length; i++) {
         if (matched.has(eligible[i].id)) continue
@@ -284,10 +285,10 @@ export async function POST(request: NextRequest) {
 
     if (matchType === 'GROUP' || matchType === 'BOTH') {
       const size = groupSize || 3
-      const unmatchedForGroup = eligible.filter((p) => !matched.has(p.id))
+      const unmatchedForGroup = eligible.filter((p) => !matchedParticipantIds.has(p.id))
 
       // Find best group by trying all combinations of `size` participants
-      const groupMatched = new Set<string>()
+      const groupMatched = matchedParticipantIds
 
       // Greedy: pick best-scoring group starting from each unmatched participant
       for (let i = 0; i < unmatchedForGroup.length; i++) {
@@ -373,14 +374,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Compute unmatched with blocker explanations
-    const matchedIds = new Set(createdMatches)
     const unmatchedParticipants = eligible
-      .filter((p) => !matchedIds.has(p.id))
+      .filter((p) => !matchedParticipantIds.has(p.id))
       .map((p) => {
         const warnings: string[] = []
         const blockers: string[] = []
 
-        const others = eligible.filter((q) => q.id !== p.id && !matchedIds.has(q.id))
+        const others = eligible.filter((q) => q.id !== p.id && !matchedParticipantIds.has(q.id))
 
         if (others.length === 0) {
           blockers.push('אין משתתפים פנויים אחרים לשיבוץ')

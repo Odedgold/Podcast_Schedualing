@@ -225,6 +225,12 @@ export default function AdminDashboard() {
     fetchMatches()
   }
 
+  async function rejectAllDrafts() {
+    if (!confirm(`Reject all ${draftMatches.length} draft matches?`)) return
+    await Promise.all(draftMatches.map((m) => fetch(`/api/admin/matches/${m.id}/reject`, { method: 'POST' })))
+    fetchMatches()
+  }
+
   async function breakMatch(id: string) {
     if (!confirm('Break this match and return participants to the pool?')) return
     await fetch(`/api/admin/matches/${id}/break`, { method: 'POST' })
@@ -1060,9 +1066,17 @@ export default function AdminDashboard() {
             {/* Draft matches */}
             {draftMatches.length > 0 && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
-                  Draft ({draftMatches.length})
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                    Draft ({draftMatches.length})
+                  </h3>
+                  <button
+                    onClick={rejectAllDrafts}
+                    className="bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg"
+                  >
+                    Reject All
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {draftMatches.map((match) => {
                     const isExpanded = expandedMatch === match.id

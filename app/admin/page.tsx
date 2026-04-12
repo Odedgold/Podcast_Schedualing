@@ -947,7 +947,7 @@ export default function AdminDashboard() {
               {/* Built-in Matching Rules */}
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">Built-in Rules</label>
-                <p className="text-xs text-gray-400 mb-3">כללי שדות מותאמים אישית מוגדרים בטאב Custom Fields.</p>
+                <p className="text-xs text-gray-400 mb-3">Custom field matching rules are configured in the Custom Fields tab.</p>
                 <div className="text-xs text-gray-400 flex gap-4 mb-2 px-1">
                   <span className="w-52">Rule</span>
                   <span className="w-24 text-center">Off</span>
@@ -985,7 +985,7 @@ export default function AdminDashboard() {
               {/* Summary of active custom field rules */}
               {customFields.some((f) => f.matchingMode !== 'OFF') && (
                 <div className="border border-blue-100 bg-blue-50 rounded-lg px-4 py-3">
-                  <p className="text-xs font-medium text-blue-700 mb-2">כללי שדות פעילים (מוגדרים בטאב Custom Fields)</p>
+                  <p className="text-xs font-medium text-blue-700 mb-2">Active field rules (configured in Custom Fields tab)</p>
                   <div className="space-y-1">
                     {customFields.filter((f) => f.matchingMode !== 'OFF').map((f) => (
                       <div key={f.id} className="flex items-center gap-2 text-xs text-blue-800">

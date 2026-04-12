@@ -98,6 +98,9 @@ export default function AdminDashboard() {
   // Calendar controls
   const [colorMode, setColorMode] = useState<'individual' | 'school' | 'country'>('individual')
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  // Manual match mode
+  const [manualMatchMode, setManualMatchMode] = useState(false)
+  const [selectedForMatch, setSelectedForMatch] = useState<Set<string>>(new Set())
   // Participant search & status
   const [participantSearch, setParticipantSearch] = useState('')
   // Schools management
@@ -223,6 +226,24 @@ export default function AdminDashboard() {
   async function rejectMatch(id: string) {
     await fetch(`/api/admin/matches/${id}/reject`, { method: 'POST' })
     fetchMatches()
+  }
+
+  async function createManualMatch() {
+    const ids = [...selectedForMatch]
+    if (ids.length < 2) return
+    const names = participants.filter((p) => selectedForMatch.has(p.id)).map((p) => p.fullName).join(', ')
+    if (!confirm(`Create an approved match for:\n${names}?`)) return
+    const res = await fetch('/api/admin/matches/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participantIds: ids }),
+    })
+    if (res.ok) {
+      setSelectedForMatch(new Set())
+      setManualMatchMode(false)
+      await fetchMatches()
+      await fetchParticipants()
+    }
   }
 
   async function rejectAllDrafts() {
@@ -548,7 +569,38 @@ export default function AdminDashboard() {
                   </div>
                   <button onClick={() => setHiddenIds(new Set())} className="text-xs text-blue-600 hover:underline">Show all</button>
                   <button onClick={() => setHiddenIds(new Set(participants.map(p => p.id)))} className="text-xs text-gray-500 hover:underline">Hide all</button>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={() => { setManualMatchMode(!manualMatchMode); setSelectedForMatch(new Set()) }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${manualMatchMode ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400 hover:text-orange-600'}`}
+                    >
+                      {manualMatchMode ? '✕ Cancel Selection' : '⊕ Manual Match Mode'}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Manual match selection panel */}
+                {manualMatchMode && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex flex-wrap items-center gap-3">
+                    <span className="text-xs font-medium text-orange-700">
+                      {selectedForMatch.size === 0
+                        ? 'Click participants in the calendar to select them for a manual match'
+                        : `Selected (${selectedForMatch.size}): ${participants.filter((p) => selectedForMatch.has(p.id)).map((p) => p.fullName).join(', ')}`
+                      }
+                    </span>
+                    {selectedForMatch.size >= 2 && (
+                      <button
+                        onClick={createManualMatch}
+                        className="ml-auto bg-orange-500 hover:bg-orange-600 text-white text-xs px-4 py-1.5 rounded-lg font-medium"
+                      >
+                        Create Match ({selectedForMatch.size} participants)
+                      </button>
+                    )}
+                    {selectedForMatch.size > 0 && (
+                      <button onClick={() => setSelectedForMatch(new Set())} className="text-xs text-orange-500 hover:underline">Clear</button>
+                    )}
+                  </div>
+                )}
 
                 {/* Legend with toggles */}
                 <div className="bg-white rounded-xl border border-gray-200 p-3">
@@ -627,36 +679,61 @@ export default function AdminDashboard() {
                 {/* Calendar grid */}
                 <div className="bg-white rounded-xl border border-gray-200 overflow-auto relative">
                   <div className="flex min-w-max">
-                    <div className="sticky left-0 bg-white z-10 border-r border-gray-100">
-                      <div className="h-14 border-b border-gray-100" />
+                    <div className="sticky left-0 bg-white z-10 border-r border-gray-200">
+                      <div className="h-14 border-b border-gray-200" />
                       {timeSlots.map((t) => (
-                        <div key={t} className="h-10 flex items-center px-2 text-xs text-gray-400 w-16 border-b border-gray-50">
-                          {t}
+                        <div key={t} className={`h-10 flex items-center px-2 text-xs w-16 ${t.endsWith(':00') ? 'text-gray-600 font-medium border-b border-gray-200' : 'text-gray-400 border-b border-gray-100'}`}>
+                          {t.endsWith(':00') ? t : ''}
                         </div>
                       ))}
                     </div>
                     {DAY_LABELS.map((dayLabel, dayIndex) => (
-                      <div key={dayIndex} className="border-r border-gray-100 min-w-[140px]">
-                        <div className="h-14 border-b border-gray-100 flex items-center justify-center">
+                      <div key={dayIndex} className="border-r border-gray-200 min-w-[140px]">
+                        <div className="h-14 border-b border-gray-200 flex items-center justify-center">
                           <div className="text-sm font-semibold text-gray-700">{dayLabel}</div>
                         </div>
                         {timeSlots.map((time) => {
                           const occupants = visibleParticipants.filter((p) => isSlotOccupied(p.id, dayIndex, time))
+                          const isHour = time.endsWith(':00')
                           return (
-                            <div key={time} className="h-10 border-b border-gray-50 relative flex" onMouseLeave={() => setTooltip(null)}>
-                              {occupants.map((p) => (
-                                <div key={p.id} className="flex-1 opacity-80 cursor-pointer"
-                                  style={{ backgroundColor: getGroupColor(p) }}
-                                  onMouseEnter={(e) => {
-                                    const rect = e.currentTarget.getBoundingClientRect()
-                                    setTooltip({ x: rect.left, y: rect.top - 30, name: occupants.map(o => o.fullName || o.email).join(', ') })
-                                  }}
-                                  onClick={(e) => {
-                                    const rect = e.currentTarget.getBoundingClientRect()
-                                    setCalendarPopup(prev => prev?.participant.id === p.id ? null : { participant: p, x: rect.left, y: rect.bottom + 8 })
-                                  }}
-                                />
-                              ))}
+                            <div
+                              key={time}
+                              className={`h-10 relative flex gap-px p-px ${isHour ? 'border-b border-gray-200 bg-gray-50' : 'border-b border-gray-100 bg-white'}`}
+                              onMouseLeave={() => setTooltip(null)}
+                            >
+                              {occupants.map((p) => {
+                                const initials = p.fullName
+                                  ? p.fullName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+                                  : (p.email?.[0] ?? '?').toUpperCase()
+                                const isSelected = selectedForMatch.has(p.id)
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className={`flex-1 min-w-0 rounded-sm cursor-pointer flex items-center justify-center overflow-hidden transition-all ${isSelected ? 'ring-2 ring-white ring-offset-1 brightness-110' : 'opacity-85 hover:opacity-100'}`}
+                                    style={{ backgroundColor: getGroupColor(p) }}
+                                    onMouseEnter={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect()
+                                      setTooltip({ x: rect.left, y: rect.top - 30, name: occupants.map((o) => o.fullName || o.email).join(', ') })
+                                    }}
+                                    onClick={(e) => {
+                                      if (manualMatchMode) {
+                                        setSelectedForMatch((prev) => {
+                                          const next = new Set(prev)
+                                          next.has(p.id) ? next.delete(p.id) : next.add(p.id)
+                                          return next
+                                        })
+                                      } else {
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        setCalendarPopup((prev) => prev?.participant.id === p.id ? null : { participant: p, x: rect.left, y: rect.bottom + 8 })
+                                      }
+                                    }}
+                                  >
+                                    <span className="text-white text-[9px] font-bold leading-none select-none drop-shadow-sm truncate px-0.5">
+                                      {isSelected ? '✓' : initials}
+                                    </span>
+                                  </div>
+                                )
+                              })}
                             </div>
                           )
                         })}

@@ -167,6 +167,8 @@ export async function POST(request: NextRequest) {
     const {
       matchType = 'PAIR',
       groupSize = 3,
+      maxPairs,
+      maxGroups,
       countrySideA = [],
       countrySideB = [],
       schoolSideA = [],
@@ -281,9 +283,13 @@ export async function POST(request: NextRequest) {
           createdMatches.push(match.id)
           matched.add(eligible[i].id)
           matched.add(eligible[bestJ].id)
+          // Stop if pair limit reached
+          if (maxPairs !== undefined && createdMatches.length >= maxPairs) break
         }
       }
     }
+
+    const pairMatchCount = createdMatches.length
 
     if (matchType === 'GROUP' || matchType === 'BOTH') {
       const size = groupSize || 3
@@ -373,6 +379,9 @@ export async function POST(request: NextRequest) {
           })
           createdMatches.push(match.id)
           resolvedGroup.forEach((p) => groupMatched.add(p.id))
+          // Stop if group limit reached
+          const groupsCreated = createdMatches.length - pairMatchCount
+          if (maxGroups !== undefined && groupsCreated >= maxGroups) break
         }
       }
     }

@@ -107,9 +107,13 @@ export default function AdminDashboard() {
   const [schools, setSchools] = useState<{ id: string; name: string; isActive: boolean; sortOrder: number }[]>([])
   const [newSchoolName, setNewSchoolName] = useState('')
 
+  // Participants filter
+  const [showMatchedParticipants, setShowMatchedParticipants] = useState(false)
   // Matching state
   const [matchType, setMatchType] = useState<'PAIR' | 'GROUP' | 'BOTH'>('PAIR')
   const [groupSize, setGroupSize] = useState(3)
+  const [maxPairs, setMaxPairs] = useState<number | ''>('')
+  const [maxGroups, setMaxGroups] = useState<number | ''>('')
   const [filterCountry, setFilterCountry] = useState('')
   const [filterSchool, setFilterSchool] = useState('')
   // Side A / Side B populations
@@ -202,6 +206,8 @@ export default function AdminDashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         matchType, groupSize,
+        maxPairs: maxPairs !== '' ? maxPairs : undefined,
+        maxGroups: maxGroups !== '' ? maxGroups : undefined,
         availabilityRule, differentSchoolRule, differentCountryRule,
         countrySideA: countrySideA.length > 0 ? countrySideA : undefined,
         countrySideB: countrySideB.length > 0 ? countrySideB : undefined,
@@ -401,12 +407,13 @@ export default function AdminDashboard() {
 
   const visibleParticipants = participants.filter((p) => !hiddenIds.has(p.id))
 
-  const filteredParticipants = participantSearch.trim()
-    ? participants.filter(p => {
-        const q = participantSearch.toLowerCase()
-        return p.fullName?.toLowerCase().includes(q) || p.schoolName?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q)
-      })
-    : participants
+  const filteredParticipants = participants
+    .filter(p => showMatchedParticipants || p.status !== 'MATCHED')
+    .filter(p => {
+      if (!participantSearch.trim()) return true
+      const q = participantSearch.toLowerCase()
+      return p.fullName?.toLowerCase().includes(q) || p.schoolName?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q)
+    })
 
   const uniqueCountries = uniqueCountriesList
   const uniqueSchools = uniqueSchoolsList
@@ -453,7 +460,13 @@ export default function AdminDashboard() {
               <h2 className="text-lg font-semibold text-gray-900">
                 Participants <span className="text-gray-400 font-normal text-sm">({participants.length})</span>
               </h2>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap items-center">
+                <button
+                  onClick={() => setShowMatchedParticipants(!showMatchedParticipants)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${showMatchedParticipants ? 'bg-green-50 text-green-700 border-green-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
+                >
+                  {showMatchedParticipants ? '✓ Showing matched' : `Show matched (${participants.filter(p => p.status === 'MATCHED').length})`}
+                </button>
                 <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                   <button
                     onClick={() => setViewMode('table')}
@@ -961,6 +974,29 @@ export default function AdminDashboard() {
                 </div>
               )}
 
+              {/* Max match limits (optional) */}
+              {matchType === 'BOTH' && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Match Limits <span className="text-gray-400 font-normal">(optional — leave blank for auto)</span></label>
+                  <div className="flex gap-3 mt-2">
+                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                      Max PAIR matches:
+                      <input type="number" min={0} value={maxPairs}
+                        onChange={(e) => setMaxPairs(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="auto"
+                        className="w-16 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                      Max GROUP matches:
+                      <input type="number" min={0} value={maxGroups}
+                        onChange={(e) => setMaxGroups(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="auto"
+                        className="w-16 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </label>
+                  </div>
+                </div>
+              )}
+
               {/* Population selection: Side A vs Side B */}
               <div className="space-y-4">
                 <p className="text-sm text-gray-500">Select populations for matching — Side A vs Side B. If nothing is selected, all participants are included.</p>
@@ -1309,21 +1345,27 @@ export default function AdminDashboard() {
                 </h3>
                 <div className="space-y-3">
                   {approvedMatches.map((match) => (
-                    <div key={match.id} className="bg-green-50 rounded-xl border border-green-200 p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.matchType === 'PAIR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                          {match.matchType}
-                        </span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')} IST
-                        </span>
-                        <span className="text-xs text-green-600 font-medium">✓ Approved</span>
-                      </div>
-                      {match.members.map((mm) => (
-                        <div key={mm.participant.id} className="text-sm text-gray-600">
-                          {mm.participant.fullName} — <span className="text-gray-400">{mm.participant.schoolName}</span>
+                    <div key={match.id} className="bg-white rounded-xl border border-green-200 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-xs text-green-600 font-bold">✓</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.matchType === 'PAIR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {match.matchType}
+                          </span>
+                          <span className="text-sm font-medium text-gray-900 truncate">
+                            {match.members.map(mm => mm.participant.fullName).join(' + ')}
+                          </span>
+                          <span className="text-xs text-gray-400 shrink-0">
+                            {utcToIst(match.scheduledStartUtc)} IST
+                          </span>
                         </div>
-                      ))}
+                        <button
+                          onClick={() => breakMatch(match.id)}
+                          className="shrink-0 ml-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-500 text-xs px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Break
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

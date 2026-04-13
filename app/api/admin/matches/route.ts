@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    const programId = request.nextUrl.searchParams.get('programId')
     const matches = await prisma.match.findMany({
+      where: programId ? { programId } : {},
       include: {
         members: {
           include: {

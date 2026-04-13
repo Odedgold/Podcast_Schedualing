@@ -169,6 +169,7 @@ export async function POST(request: NextRequest) {
       groupSize = 3,
       maxPairs,
       maxGroups,
+      programId,
       countrySideA = [],
       countrySideB = [],
       schoolSideA = [],
@@ -190,6 +191,7 @@ export async function POST(request: NextRequest) {
     const allSelectedSchools = [...new Set([...schoolSideA, ...schoolSideB])]
 
     const participantFilter: Record<string, unknown> = { status: 'PENDING' }
+    if (programId) participantFilter.programId = programId
     if (allSelectedCountries.length > 0) participantFilter.country = { in: allSelectedCountries }
     if (allSelectedSchools.length > 0) participantFilter.schoolName = { in: allSelectedSchools }
 
@@ -272,6 +274,7 @@ export async function POST(request: NextRequest) {
               scheduledStartUtc: startUtc,
               scheduledEndUtc: endUtc,
               systemNotes: sysNotes || null,
+              programId: programId ?? null,
               members: {
                 create: [
                   { participantId: eligible[i].id },
@@ -374,6 +377,7 @@ export async function POST(request: NextRequest) {
               scheduledStartUtc: startUtc,
               scheduledEndUtc: endUtc,
               systemNotes: groupNotes.join(' | ') || null,
+              programId: programId ?? null,
               members: { create: resolvedGroup.map((p) => ({ participantId: p.id })) },
             },
           })

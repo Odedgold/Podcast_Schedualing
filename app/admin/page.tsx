@@ -5,6 +5,13 @@ import * as XLSX from 'xlsx'
 import { DateTime } from 'luxon'
 
 type FieldType = 'TEXT' | 'NUMBER' | 'SELECT' | 'MULTISELECT'
+
+interface Program {
+  id: string
+  name: string
+  slug: string
+  createdAt: string
+}
 type MatchStatus = 'DRAFT' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 type MatchType = 'PAIR' | 'GROUP'
 type ParticipantStatus = 'PENDING' | 'MATCHED' | 'INACTIVE'
@@ -88,6 +95,8 @@ function utcToIst(utcIso: string) {
 }
 
 export default function AdminDashboard() {
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null)
   const [tab, setTab] = useState<'participants' | 'fields' | 'matching' | 'matches' | 'schools'>('participants')
   const [participants, setParticipants] = useState<Participant[]>([])
   const [customFields, setCustomFields] = useState<CustomField[]>([])
@@ -138,9 +147,10 @@ export default function AdminDashboard() {
   const [newField, setNewField] = useState({ label: '', fieldKey: '', fieldType: 'TEXT' as FieldType, options: '', isRequired: false })
 
   const fetchParticipants = useCallback(async () => {
-    const res = await fetch('/api/admin/participants')
+    const url = selectedProgramId ? `/api/admin/participants?programId=${selectedProgramId}` : '/api/admin/participants'
+    const res = await fetch(url)
     if (res.ok) setParticipants(await res.json())
-  }, [])
+  }, [selectedProgramId])
 
   const fetchCustomFields = useCallback(async () => {
     const res = await fetch('/api/admin/custom-fields')
@@ -148,13 +158,23 @@ export default function AdminDashboard() {
   }, [])
 
   const fetchMatches = useCallback(async () => {
-    const res = await fetch('/api/admin/matches')
+    const url = selectedProgramId ? `/api/admin/matches?programId=${selectedProgramId}` : '/api/admin/matches'
+    const res = await fetch(url)
     if (res.ok) setMatches(await res.json())
-  }, [])
+  }, [selectedProgramId])
 
   const fetchSchools = useCallback(async () => {
     const res = await fetch('/api/admin/schools')
     if (res.ok) setSchools(await res.json())
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/admin/programs')
+      .then(r => r.json())
+      .then((data: Program[]) => {
+        setPrograms(data)
+        if (data.length > 0) setSelectedProgramId(data[0].id)
+      })
   }, [])
 
   useEffect(() => {
@@ -206,6 +226,7 @@ export default function AdminDashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         matchType, groupSize,
+        programId: selectedProgramId,
         maxPairs: maxPairs !== '' ? maxPairs : undefined,
         maxGroups: maxGroups !== '' ? maxGroups : undefined,
         availabilityRule, differentSchoolRule, differentCountryRule,
@@ -242,7 +263,7 @@ export default function AdminDashboard() {
     const res = await fetch('/api/admin/matches/manual', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ participantIds: ids }),
+      body: JSON.stringify({ participantIds: ids, programId: selectedProgramId }),
     })
     if (res.ok) {
       setSelectedForMatch(new Set())
@@ -345,9 +366,9 @@ export default function AdminDashboard() {
     if (a.country !== b.country) pros.push(`Different countries: ${a.country} / ${b.country}`)
     else cons.push(`Same country: ${a.country}`)
     // Dynamic custom fields
-    const aMap = Object.fromEntries((a.customFields || []).map((cf) => [cf.field.label, cf.value]))
-    const bMap = Object.fromEntries((b.customFields || []).map((cf) => [cf.field.label, cf.value]))
-    const labels = new Set([...(a.customFields || []).map((cf) => cf.field.label), ...(b.customFields || []).map((cf) => cf.field.label)])
+    const aMap = Object.fromEntries((a.customFields || []).map((cf) => [parseFieldLabel(cf.field.label), cf.value]))
+    const bMap = Object.fromEntries((b.customFields || []).map((cf) => [parseFieldLabel(cf.field.label), cf.value]))
+    const labels = new Set([...(a.customFields || []).map((cf) => parseFieldLabel(cf.field.label)), ...(b.customFields || []).map((cf) => parseFieldLabel(cf.field.label))])
     for (const label of labels) {
       const va = aMap[label]
       const vb = bMap[label]
@@ -372,12 +393,16 @@ export default function AdminDashboard() {
     fetchSchools()
   }
 
+  function parseFieldLabel(raw: string): string {
+    try { const p = JSON.parse(raw); return p.en ?? raw } catch { return raw }
+  }
+
   const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   const timeSlots: string[] = []
-  for (let h = 6; h < 23; h++) {
+  for (let h = 6; h <= 23; h++) {
     timeSlots.push(`${String(h).padStart(2, '0')}:00`)
-    timeSlots.push(`${String(h).padStart(2, '0')}:30`)
+    if (h < 23) timeSlots.push(`${String(h).padStart(2, '0')}:30`)
   }
 
   const uniqueSchoolsList = [...new Set(participants.map((p) => p.schoolName))].sort()
@@ -433,7 +458,7 @@ export default function AdminDashboard() {
         <h1 className="text-xl font-bold text-gray-900">Scheduling & Matching Platform</h1>
         <div className="flex gap-3">
           <a href="/admin/generate-link" className="text-sm text-blue-600 hover:underline">
-            Generate Link
+            Programs
           </a>
           <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-700">
             Logout
@@ -441,8 +466,31 @@ export default function AdminDashboard() {
         </div>
       </header>
 
+      {/* Program selector */}
+      <div className="sticky top-[65px] z-20 bg-blue-950 px-6 py-2 flex items-center gap-2 overflow-x-auto">
+        {programs.map((prog) => (
+          <button
+            key={prog.id}
+            onClick={() => setSelectedProgramId(prog.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              selectedProgramId === prog.id
+                ? 'bg-white text-blue-900'
+                : 'bg-blue-800 text-blue-100 hover:bg-blue-700'
+            }`}
+          >
+            {prog.name}
+          </button>
+        ))}
+        <a
+          href="/admin/generate-link"
+          className="ml-auto text-xs text-blue-300 hover:text-white whitespace-nowrap transition-colors"
+        >
+          + New Program
+        </a>
+      </div>
+
       {/* Tabs */}
-      <div className="sticky top-[65px] z-20 bg-white border-b border-gray-200 px-6">
+      <div className="sticky top-[105px] z-20 bg-white border-b border-gray-200 px-6">
         <div className="flex gap-6">
           {(['participants', 'fields', 'matching', 'matches', 'schools'] as const).map((t) => (
             <button
@@ -796,7 +844,7 @@ export default function AdminDashboard() {
                         <div className="pt-1 border-t border-gray-100 space-y-0.5">
                           {calendarPopup.participant.customFields.map((cf) => (
                             <div key={cf.field.label} className="flex gap-1">
-                              <span className="text-gray-400 w-16 shrink-0 truncate">{cf.field.label}</span>
+                              <span className="text-gray-400 w-16 shrink-0 truncate">{parseFieldLabel(cf.field.label)}</span>
                               <span>{cf.value}</span>
                             </div>
                           ))}
@@ -895,7 +943,7 @@ export default function AdminDashboard() {
                 <div key={field.id} className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium text-gray-900 text-sm">{field.label}</div>
+                      <div className="font-medium text-gray-900 text-sm">{parseFieldLabel(field.label)}</div>
                       <div className="text-xs text-gray-400">{field.fieldKey} · {field.fieldType}{field.isRequired ? ' · Required' : ''}</div>
                       {field.options.length > 0 && (
                         <div className="text-xs text-gray-400">{field.options.join(', ')}</div>
@@ -1128,7 +1176,7 @@ export default function AdminDashboard() {
                     {customFields.filter((f) => f.matchingMode !== 'OFF').map((f) => (
                       <div key={f.id} className="flex items-center gap-2 text-xs text-blue-800">
                         <span className={`px-1.5 py-0.5 rounded font-medium ${f.matchingMode === 'MANDATORY' ? 'bg-red-500 text-white' : 'bg-yellow-400 text-white'}`}>{f.matchingMode}</span>
-                        <span>{f.label}</span>
+                        <span>{parseFieldLabel(f.label)}</span>
                         <span className="text-blue-400">· {f.matchingType}{f.matchingMode === 'PREFERRED' ? ` · weight ${f.matchingWeight}` : ''}</span>
                       </div>
                     ))}

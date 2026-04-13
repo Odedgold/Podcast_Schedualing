@@ -22,9 +22,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    let participant
+    // Resolve which program this submission belongs to (token = program slug)
+    let programId: string | null = null
     if (token) {
-      participant = await prisma.participant.findUnique({ where: { submissionToken: token } })
+      const program = await prisma.program.findUnique({ where: { slug: token } })
+      if (program) programId = program.id
     }
 
     const coreData = {
@@ -36,16 +38,10 @@ export async function POST(request: NextRequest) {
       country,
       detectedTz: detectedTz || confirmedTz,
       confirmedTz,
+      programId,
     }
 
-    if (participant) {
-      participant = await prisma.participant.update({
-        where: { submissionToken: token },
-        data: { ...coreData, status: 'PENDING' },
-      })
-    } else {
-      participant = await prisma.participant.create({ data: coreData })
-    }
+    const participant = await prisma.participant.create({ data: coreData })
 
     if (availability && Array.isArray(availability)) {
       await prisma.availabilitySlot.deleteMany({ where: { participantId: participant.id } })

@@ -56,7 +56,7 @@ function findCommonOverlap(participants: { availability: { dayOfWeek: number; st
 
 export async function POST(request: NextRequest) {
   try {
-    const { participantIds } = await request.json()
+    const { participantIds, programId } = await request.json()
     if (!Array.isArray(participantIds) || participantIds.length < 2) {
       return Response.json({ error: 'At least 2 participant IDs required' }, { status: 400 })
     }
@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
         approvedAt: new Date(),
         approvedBy: 'admin-manual',
         adminNotes: 'Manual match created by admin',
+        programId: programId ?? null,
         members: { create: participantIds.map((id: string) => ({ participantId: id })) },
       },
     })

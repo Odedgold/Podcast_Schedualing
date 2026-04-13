@@ -2,45 +2,54 @@
 
 import { useState, useEffect } from 'react'
 
-interface GeneratedLink {
-  token: string
-  url: string
+interface Program {
+  id: string
+  name: string
+  slug: string
+  isActive: boolean
   createdAt: string
 }
 
-export default function GenerateLinkPage() {
-  const [links, setLinks] = useState<GeneratedLink[]>([])
+export default function ProgramsPage() {
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [newName, setNewName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
 
-  useEffect(() => {
-    const stored = localStorage.getItem('generated_links')
-    if (stored) setLinks(JSON.parse(stored))
-  }, [])
-
-  async function generateLink() {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/participants/generate-token', { method: 'POST' })
-      if (res.ok) {
-        const data = await res.json()
-        const newLink: GeneratedLink = {
-          token: data.token,
-          url: data.url,
-          createdAt: new Date().toISOString(),
-        }
-        const updated = [newLink, ...links]
-        setLinks(updated)
-        localStorage.setItem('generated_links', JSON.stringify(updated))
-      }
-    } finally {
-      setLoading(false)
-    }
+  function getUrl(slug: string) {
+    return `${window.location.origin}/form/${slug}`
   }
 
-  async function copyToClipboard(url: string) {
-    await navigator.clipboard.writeText(url)
-    setCopied(url)
+  async function fetchPrograms() {
+    const res = await fetch('/api/admin/programs')
+    if (res.ok) setPrograms(await res.json())
+  }
+
+  useEffect(() => { fetchPrograms() }, [])
+
+  async function createProgram() {
+    if (!newName.trim()) return
+    setLoading(true)
+    setError('')
+    const res = await fetch('/api/admin/programs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() }),
+    })
+    if (res.ok) {
+      setNewName('')
+      await fetchPrograms()
+    } else {
+      const data = await res.json()
+      setError(data.error ?? 'Failed to create program')
+    }
+    setLoading(false)
+  }
+
+  async function copyToClipboard(slug: string) {
+    await navigator.clipboard.writeText(getUrl(slug))
+    setCopied(slug)
     setTimeout(() => setCopied(null), 2000)
   }
 
@@ -48,47 +57,63 @@ export default function GenerateLinkPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
         <a href="/admin" className="text-sm text-blue-600 hover:underline">← Dashboard</a>
-        <h1 className="text-xl font-bold text-gray-900">Generate Submission Links</h1>
+        <h1 className="text-xl font-bold text-gray-900">Programs</h1>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <p className="text-gray-600 text-sm mb-4">
-            Generate unique submission links to share with participants. Each link is pre-filled with a unique token.
+      <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+        {/* Create */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">Create New Program</h2>
+          <p className="text-xs text-gray-400 mb-4">
+            Each program gets a unique link. All participants who submit via that link are grouped together.
           </p>
-          <button
-            onClick={generateLink}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-6 py-2.5 rounded-lg transition-colors"
-          >
-            {loading ? 'Generating...' : '+ Generate New Link'}
-          </button>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder='e.g. "Season 2 – Israel"'
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createProgram()}
+            />
+            <button
+              onClick={createProgram}
+              disabled={loading || !newName.trim()}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              {loading ? 'Creating...' : '+ Create'}
+            </button>
+          </div>
+          {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
         </div>
 
-        {links.length > 0 && (
+        {/* List */}
+        {programs.length > 0 && (
           <div>
             <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
-              Generated Links ({links.length})
+              Programs ({programs.length})
             </h2>
             <div className="space-y-3">
-              {links.map((link) => (
-                <div key={link.token} className="bg-white rounded-xl border border-gray-200 p-4">
+              {programs.map((prog) => (
+                <div key={prog.id} className="bg-white rounded-xl border border-gray-200 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-mono text-gray-700 truncate">{link.url}</div>
+                      <div className="text-sm font-semibold text-gray-900">{prog.name}</div>
+                      <div className="text-xs font-mono text-gray-500 truncate mt-0.5">
+                        /form/{prog.slug}
+                      </div>
                       <div className="text-xs text-gray-400 mt-0.5">
-                        Token: {link.token.slice(0, 8)}... · {new Date(link.createdAt).toLocaleString()}
+                        Created {new Date(prog.createdAt).toLocaleDateString()}
                       </div>
                     </div>
                     <button
-                      onClick={() => copyToClipboard(link.url)}
+                      onClick={() => copyToClipboard(prog.slug)}
                       className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        copied === link.url
+                        copied === prog.slug
                           ? 'bg-green-100 text-green-700'
                           : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                       }`}
                     >
-                      {copied === link.url ? '✓ Copied!' : 'Copy'}
+                      {copied === prog.slug ? '✓ Copied!' : 'Copy Link'}
                     </button>
                   </div>
                 </div>
@@ -97,9 +122,9 @@ export default function GenerateLinkPage() {
           </div>
         )}
 
-        {links.length === 0 && (
-          <div className="text-center text-gray-400 py-12">
-            No links generated yet. Click the button above to create one.
+        {programs.length === 0 && (
+          <div className="text-center text-gray-400 py-12 text-sm">
+            No programs yet. Create one above.
           </div>
         )}
       </main>

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { PRIORITY_TIMEZONES, ALL_TIMEZONES } from '@/lib/timezone'
 
 type Lang = 'en' | 'he' | 'es'
 type FieldType = 'TEXT' | 'NUMBER' | 'SELECT' | 'MULTISELECT'
@@ -17,6 +16,97 @@ interface FieldDef {
   sortOrder: number
 }
 
+// ── Geography & timezone data ─────────────────────────────────────────────────
+
+const USA_STATES: { name: string; tz: string }[] = [
+  { name: 'Alabama', tz: 'America/Chicago' },
+  { name: 'Alaska', tz: 'America/Anchorage' },
+  { name: 'Arizona', tz: 'America/Phoenix' },
+  { name: 'Arkansas', tz: 'America/Chicago' },
+  { name: 'California', tz: 'America/Los_Angeles' },
+  { name: 'Colorado', tz: 'America/Denver' },
+  { name: 'Connecticut', tz: 'America/New_York' },
+  { name: 'Delaware', tz: 'America/New_York' },
+  { name: 'Florida', tz: 'America/New_York' },
+  { name: 'Georgia', tz: 'America/New_York' },
+  { name: 'Hawaii', tz: 'Pacific/Honolulu' },
+  { name: 'Idaho', tz: 'America/Denver' },
+  { name: 'Illinois', tz: 'America/Chicago' },
+  { name: 'Indiana', tz: 'America/Indiana/Indianapolis' },
+  { name: 'Iowa', tz: 'America/Chicago' },
+  { name: 'Kansas', tz: 'America/Chicago' },
+  { name: 'Kentucky', tz: 'America/New_York' },
+  { name: 'Louisiana', tz: 'America/Chicago' },
+  { name: 'Maine', tz: 'America/New_York' },
+  { name: 'Maryland', tz: 'America/New_York' },
+  { name: 'Massachusetts', tz: 'America/New_York' },
+  { name: 'Michigan', tz: 'America/New_York' },
+  { name: 'Minnesota', tz: 'America/Chicago' },
+  { name: 'Mississippi', tz: 'America/Chicago' },
+  { name: 'Missouri', tz: 'America/Chicago' },
+  { name: 'Montana', tz: 'America/Denver' },
+  { name: 'Nebraska', tz: 'America/Chicago' },
+  { name: 'Nevada', tz: 'America/Los_Angeles' },
+  { name: 'New Hampshire', tz: 'America/New_York' },
+  { name: 'New Jersey', tz: 'America/New_York' },
+  { name: 'New Mexico', tz: 'America/Denver' },
+  { name: 'New York', tz: 'America/New_York' },
+  { name: 'North Carolina', tz: 'America/New_York' },
+  { name: 'North Dakota', tz: 'America/Chicago' },
+  { name: 'Ohio', tz: 'America/New_York' },
+  { name: 'Oklahoma', tz: 'America/Chicago' },
+  { name: 'Oregon', tz: 'America/Los_Angeles' },
+  { name: 'Pennsylvania', tz: 'America/New_York' },
+  { name: 'Rhode Island', tz: 'America/New_York' },
+  { name: 'South Carolina', tz: 'America/New_York' },
+  { name: 'South Dakota', tz: 'America/Chicago' },
+  { name: 'Tennessee', tz: 'America/Chicago' },
+  { name: 'Texas', tz: 'America/Chicago' },
+  { name: 'Utah', tz: 'America/Denver' },
+  { name: 'Vermont', tz: 'America/New_York' },
+  { name: 'Virginia', tz: 'America/New_York' },
+  { name: 'Washington', tz: 'America/Los_Angeles' },
+  { name: 'West Virginia', tz: 'America/New_York' },
+  { name: 'Wisconsin', tz: 'America/Chicago' },
+  { name: 'Wyoming', tz: 'America/Denver' },
+]
+
+const EUROPE_COUNTRIES: { name: string; tz: string }[] = [
+  { name: 'Austria', tz: 'Europe/Vienna' },
+  { name: 'Belgium', tz: 'Europe/Brussels' },
+  { name: 'Bulgaria', tz: 'Europe/Sofia' },
+  { name: 'Croatia', tz: 'Europe/Zagreb' },
+  { name: 'Cyprus', tz: 'Asia/Nicosia' },
+  { name: 'Czech Republic', tz: 'Europe/Prague' },
+  { name: 'Denmark', tz: 'Europe/Copenhagen' },
+  { name: 'Estonia', tz: 'Europe/Tallinn' },
+  { name: 'Finland', tz: 'Europe/Helsinki' },
+  { name: 'France', tz: 'Europe/Paris' },
+  { name: 'Germany', tz: 'Europe/Berlin' },
+  { name: 'Greece', tz: 'Europe/Athens' },
+  { name: 'Hungary', tz: 'Europe/Budapest' },
+  { name: 'Ireland', tz: 'Europe/Dublin' },
+  { name: 'Italy', tz: 'Europe/Rome' },
+  { name: 'Latvia', tz: 'Europe/Riga' },
+  { name: 'Lithuania', tz: 'Europe/Vilnius' },
+  { name: 'Luxembourg', tz: 'Europe/Luxembourg' },
+  { name: 'Malta', tz: 'Europe/Malta' },
+  { name: 'Netherlands', tz: 'Europe/Amsterdam' },
+  { name: 'Norway', tz: 'Europe/Oslo' },
+  { name: 'Poland', tz: 'Europe/Warsaw' },
+  { name: 'Portugal', tz: 'Europe/Lisbon' },
+  { name: 'Romania', tz: 'Europe/Bucharest' },
+  { name: 'Slovakia', tz: 'Europe/Bratislava' },
+  { name: 'Slovenia', tz: 'Europe/Ljubljana' },
+  { name: 'Spain', tz: 'Europe/Madrid' },
+  { name: 'Sweden', tz: 'Europe/Stockholm' },
+  { name: 'Switzerland', tz: 'Europe/Zurich' },
+  { name: 'Ukraine', tz: 'Europe/Kyiv' },
+  { name: 'United Kingdom', tz: 'Europe/London' },
+]
+
+// ── Translations ──────────────────────────────────────────────────────────────
+
 const DAY_LABELS: Record<Lang, string[]> = {
   en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   he: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'],
@@ -28,12 +118,20 @@ const T: Record<Lang, Record<string, string>> = {
     title: 'Registration Form',
     step1: 'Personal Info', step2: 'Questions', step3: 'Availability',
     fullName: 'Full Name', email: 'Email', phone: 'Phone (optional)',
-    school: 'School Name', city: 'City', country: 'Country',
-    timezone: 'Your Timezone', timezoneSearch: 'Search timezone...',
-    priorityTz: 'Common Timezones', allTz: 'All Timezones',
+    school: 'School Name', city: 'City',
+    countryLabel: 'Country / State',
+    regionIsrael: '🇮🇱  Israel',
+    regionUSA: '🇺🇸  USA',
+    regionEurope: '🇪🇺  Europe',
+    selectState: 'Select your state...',
+    selectCountry: 'Select your country...',
+    tzAutoSet: 'Timezone set automatically based on your location',
     next: 'Next', back: 'Back', submit: 'Submit', submitting: 'Submitting...',
     availTitle: 'Select Your Availability',
-    availSubtitle: 'Click slots when you are free (30-minute blocks, 6:00–23:00)',
+    availSubtitle: 'Click the blocks when you could be free (30-minute slots, 6:00–23:00)',
+    availTipMore: 'The more slots you mark, the better your chances of being matched! Mark any time you might be available — even if it\'s not your first choice.',
+    availTipSchool: 'If your school has a Hebrew or English class where you could work on the podcast, mark that time too — even if it falls during school hours.',
+    availTipNoCommitment: 'No commitment yet! Marking a slot doesn\'t mean you must meet every week at that time. Your actual session times will be agreed upon with your partner after the match.',
     slotsSelected: 'slots selected',
     successTitle: 'Thank you!', successMsg: 'Your availability has been submitted successfully.',
     required: 'This field is required', invalidEmail: 'Please enter a valid email',
@@ -48,12 +146,20 @@ const T: Record<Lang, Record<string, string>> = {
     title: 'טופס הרשמה',
     step1: 'פרטים אישיים', step2: 'שאלות', step3: 'זמינות',
     fullName: 'שם מלא', email: 'אימייל', phone: 'טלפון (אופציונלי)',
-    school: 'שם בית הספר', city: 'עיר', country: 'מדינה',
-    timezone: 'אזור הזמן שלך', timezoneSearch: 'חפש אזור זמן...',
-    priorityTz: 'אזורי זמן נפוצים', allTz: 'כל אזורי הזמן',
+    school: 'שם בית הספר', city: 'עיר',
+    countryLabel: 'מדינה / מחוז',
+    regionIsrael: '🇮🇱  ישראל',
+    regionUSA: '🇺🇸  ארה״ב',
+    regionEurope: '🇪🇺  אירופה',
+    selectState: 'בחר מדינה (State)...',
+    selectCountry: 'בחר מדינה...',
+    tzAutoSet: 'אזור הזמן הוגדר אוטומטית לפי המיקום שבחרת',
     next: 'הבא', back: 'חזרה', submit: 'שלח', submitting: 'שולח...',
     availTitle: 'בחר את הזמינות שלך',
-    availSubtitle: 'לחץ על משבצות בהן אתה פנוי (30 דקות, 06:00–23:00)',
+    availSubtitle: 'לחץ על המשבצות בהן אתה עשוי להיות פנוי (בלוקים של 30 דקות, 06:00–23:00)',
+    availTipMore: 'ככל שתסמן יותר שעות — כך גדלים הסיכויים שנוכל לשבץ אותך! סמן כל זמן שבו אתה יכול להיות זמין, גם אם זה לא הזמן המועדף עליך.',
+    availTipSchool: 'אם בבית הספר שלך יש שיעור עברית או אנגלית שבו ניתן לעבוד על הפודקאסט — סמן גם את הזמן הזה, גם אם הוא נמצא בתוך שעות הלימוד.',
+    availTipNoCommitment: 'אין כאן עדיין התחייבות! סימון שעה לא אומר שחייבים להיפגש בה כל שבוע. הזמנים הסופיים יתואמו עם השותף שלך אחרי השיבוץ.',
     slotsSelected: 'משבצות נבחרו',
     successTitle: 'תודה!', successMsg: 'הזמינות שלך נשלחה בהצלחה.',
     required: 'שדה זה הוא חובה', invalidEmail: 'נא להזין כתובת אימייל תקינה',
@@ -68,12 +174,20 @@ const T: Record<Lang, Record<string, string>> = {
     title: 'Formulario de Registro',
     step1: 'Información Personal', step2: 'Preguntas', step3: 'Disponibilidad',
     fullName: 'Nombre Completo', email: 'Correo Electrónico', phone: 'Teléfono (opcional)',
-    school: 'Nombre de la Escuela', city: 'Ciudad', country: 'País',
-    timezone: 'Tu Zona Horaria', timezoneSearch: 'Buscar zona horaria...',
-    priorityTz: 'Zonas Horarias Comunes', allTz: 'Todas las Zonas Horarias',
+    school: 'Nombre de la Escuela', city: 'Ciudad',
+    countryLabel: 'País / Estado',
+    regionIsrael: '🇮🇱  Israel',
+    regionUSA: '🇺🇸  EE.UU.',
+    regionEurope: '🇪🇺  Europa',
+    selectState: 'Selecciona tu estado...',
+    selectCountry: 'Selecciona tu país...',
+    tzAutoSet: 'Zona horaria configurada automáticamente según tu ubicación',
     next: 'Siguiente', back: 'Atrás', submit: 'Enviar', submitting: 'Enviando...',
     availTitle: 'Selecciona tu Disponibilidad',
-    availSubtitle: 'Haz clic en los bloques cuando estés disponible (30 minutos, 6:00–23:00)',
+    availSubtitle: 'Haz clic en los bloques cuando puedas estar disponible (30 minutos, 6:00–23:00)',
+    availTipMore: '¡Cuantos más bloques marques, mayores son tus posibilidades de ser emparejado! Marca todos los momentos en que puedas estar disponible, aunque no sean los ideales.',
+    availTipSchool: 'Si en tu escuela tienes una clase de hebreo o inglés donde puedas trabajar en el podcast, ¡márcala también! Incluso si es durante el horario escolar.',
+    availTipNoCommitment: '¡Sin compromiso por ahora! Marcar un bloque no significa que debas reunirte todas las semanas a esa hora. Los horarios reales se acordarán con tu compañero/a tras el emparejamiento.',
     slotsSelected: 'bloques seleccionados',
     successTitle: '¡Gracias!', successMsg: 'Tu disponibilidad se ha enviado correctamente.',
     required: 'Este campo es obligatorio', invalidEmail: 'Por favor ingresa un correo válido',
@@ -86,6 +200,8 @@ const T: Record<Lang, Record<string, string>> = {
   },
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function FormPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
   const [lang, setLang] = useState<Lang>('en')
@@ -93,30 +209,28 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [tzSearch, setTzSearch] = useState('')
   const [schoolList, setSchoolList] = useState<string[]>([])
   const [schoolOther, setSchoolOther] = useState(false)
   const [fieldDefs, setFieldDefs] = useState<FieldDef[]>([])
   const [consentGiven, setConsentGiven] = useState(false)
+  // Country/region selection: israel | usa | europe
+  const [countryRegion, setCountryRegion] = useState<'israel' | 'usa' | 'europe' | null>(null)
 
   const t = T[lang]
   const isRtl = lang === 'he'
 
-  // Fixed core fields
   const [form, setForm] = useState({
     fullName: '', email: '', phone: '',
     schoolName: '', city: '', country: '',
     confirmedTz: '', detectedTz: '',
   })
 
-  // Dynamic custom field values: fieldKey → value
   const [customValues, setCustomValues] = useState<Record<string, string>>({})
-
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const detected = Intl.DateTimeFormat().resolvedOptions().timeZone
-    setForm((f) => ({ ...f, detectedTz: detected, confirmedTz: detected }))
+    setForm((f) => ({ ...f, detectedTz: detected }))
   }, [])
 
   useEffect(() => {
@@ -132,6 +246,35 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
       .then((data: FieldDef[]) => setFieldDefs(data))
       .catch(() => {})
   }, [])
+
+  // ── Country/region selection helpers ───────────────────────────────────────
+
+  function selectIsrael() {
+    setCountryRegion('israel')
+    setForm(f => ({ ...f, country: 'Israel', confirmedTz: 'Asia/Jerusalem' }))
+    setErrors(prev => { const n = { ...prev }; delete n.country; delete n.confirmedTz; return n })
+  }
+
+  function selectUSAState(state: { name: string; tz: string }) {
+    setForm(f => ({ ...f, country: state.name, confirmedTz: state.tz }))
+    setErrors(prev => { const n = { ...prev }; delete n.country; delete n.confirmedTz; return n })
+  }
+
+  function selectEuropeCountry(country: { name: string; tz: string }) {
+    setForm(f => ({ ...f, country: country.name, confirmedTz: country.tz }))
+    setErrors(prev => { const n = { ...prev }; delete n.country; delete n.confirmedTz; return n })
+  }
+
+  function switchRegion(region: 'israel' | 'usa' | 'europe') {
+    setCountryRegion(region)
+    // Clear previous country/tz selection when switching region
+    if (region !== countryRegion) {
+      setForm(f => ({ ...f, country: '', confirmedTz: '' }))
+    }
+    if (region === 'israel') selectIsrael()
+  }
+
+  // ── Validation ────────────────────────────────────────────────────────────
 
   function validateStep1() {
     const e: Record<string, string> = {}
@@ -149,9 +292,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   function validateStep2() {
     const e: Record<string, string> = {}
     for (const f of fieldDefs) {
-      if (f.isRequired && !customValues[f.fieldKey]?.trim()) {
-        e[f.fieldKey] = t.required
-      }
+      if (f.isRequired && !customValues[f.fieldKey]?.trim()) e[f.fieldKey] = t.required
     }
     setErrors(e)
     return Object.keys(e).length === 0
@@ -188,7 +329,6 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
         return { dayOfWeek: parseInt(dayStr), startTime, endTime }
       })
 
-      // Build customFields map: fieldId → value
       const customFields: Record<string, string> = {}
       for (const fd of fieldDefs) {
         if (customValues[fd.fieldKey] !== undefined) {
@@ -207,22 +347,28 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     }
   }
 
-  const filteredTz = ALL_TIMEZONES.filter(tz =>
-    tz.label.toLowerCase().includes(tzSearch.toLowerCase())
-  ).slice(0, 100)
+  function parseLabel(raw: string): string {
+    try {
+      const parsed = JSON.parse(raw)
+      return parsed[lang] ?? parsed.en ?? raw
+    } catch {
+      return raw
+    }
+  }
 
-  // ── Dynamic field renderer ──────────────────────────────────────────────
+  // ── Dynamic field renderer ────────────────────────────────────────────────
+
   function renderField(fd: FieldDef) {
+    const label = parseLabel(fd.label)
     const val = customValues[fd.fieldKey] ?? ''
     const err = errors[fd.fieldKey]
     const base = `w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${err ? 'border-red-400' : 'border-gray-300'}`
-
     const set = (v: string) => setCustomValues(prev => ({ ...prev, [fd.fieldKey]: v }))
 
     if (fd.fieldType === 'SELECT') {
       return (
         <div key={fd.id}>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{label}{fd.isRequired ? ' *' : ''}</label>
           <select className={base + ' bg-white'} value={val} onChange={e => set(e.target.value)}>
             <option value="">{t.selectOption}</option>
             {fd.options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -240,7 +386,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
       }
       return (
         <div key={fd.id}>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{label}{fd.isRequired ? ' *' : ''}</label>
           <div className="flex flex-wrap gap-2">
             {fd.options.map(o => (
               <button key={o} type="button" onClick={() => toggle(o)}
@@ -257,7 +403,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     if (fd.fieldType === 'NUMBER') {
       return (
         <div key={fd.id}>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{label}{fd.isRequired ? ' *' : ''}</label>
           <input type="number" className={base} value={val} placeholder={fd.placeholder ?? ''}
             onChange={e => set(e.target.value)} />
           {err && <p className="text-red-500 text-xs mt-1">{err}</p>}
@@ -265,10 +411,9 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
       )
     }
 
-    // TEXT (default)
     return (
       <div key={fd.id}>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{fd.label}{fd.isRequired ? ' *' : ''}</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{label}{fd.isRequired ? ' *' : ''}</label>
         <input className={base} value={val} placeholder={fd.placeholder ?? ''}
           onChange={e => set(e.target.value)} />
         {err && <p className="text-red-500 text-xs mt-1">{err}</p>}
@@ -276,7 +421,8 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     )
   }
 
-  // ── Submitted ───────────────────────────────────────────────────────────
+  // ── Submitted ─────────────────────────────────────────────────────────────
+
   if (submitted) {
     return (
       <div className={`min-h-screen bg-gray-50 flex items-center justify-center p-4 ${isRtl ? 'rtl' : 'ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
@@ -293,7 +439,12 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     )
   }
 
-  // ── Form ────────────────────────────────────────────────────────────────
+  // ── Form ──────────────────────────────────────────────────────────────────
+
+  const regionBtnBase = 'flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors'
+  const regionBtnActive = 'bg-blue-600 text-white border-blue-600'
+  const regionBtnInactive = 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+
   return (
     <div className={`min-h-screen bg-gray-50 ${isRtl ? 'rtl' : 'ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -353,7 +504,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.school} *</label>
                   {schoolList.length > 0 ? (
                     <>
-                      <select className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
+                      <select className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
                         value={schoolOther ? '__other__' : form.schoolName}
                         onChange={e => {
                           if (e.target.value === '__other__') { setSchoolOther(true); setForm({ ...form, schoolName: '' }) }
@@ -376,52 +527,70 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                   {errors.schoolName && <p className="text-red-500 text-xs mt-1">{errors.schoolName}</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.city} *</label>
-                    <input className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city ? 'border-red-400' : 'border-gray-300'}`}
-                      value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
-                    {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.country} *</label>
-                    <input className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.country ? 'border-red-400' : 'border-gray-300'}`}
-                      value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
-                    {errors.country && <p className="text-red-500 text-xs mt-1">{errors.country}</p>}
-                  </div>
+                {/* City */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.city} *</label>
+                  <input className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city ? 'border-red-400' : 'border-gray-300'}`}
+                    value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+                  {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
                 </div>
 
-                {/* Timezone */}
+                {/* Country / State selector */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.timezone} *</label>
-                  <div className={`border rounded-lg overflow-hidden ${errors.confirmedTz ? 'border-red-400' : 'border-gray-300'}`}>
-                    <div className="bg-blue-50 p-2 border-b border-gray-200">
-                      <p className="text-xs font-medium text-blue-700 px-1 mb-1">{t.priorityTz}</p>
-                      <div className="grid grid-cols-1 gap-1">
-                        {PRIORITY_TIMEZONES.map(tz => (
-                          <button key={tz.value} type="button" onClick={() => setForm({ ...form, confirmedTz: tz.value })}
-                            className={`text-left px-3 py-1.5 rounded text-sm transition-colors ${form.confirmedTz === tz.value ? 'bg-blue-600 text-white' : 'hover:bg-blue-100 text-gray-700'}`}>
-                            {tz.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="p-2">
-                      <p className="text-xs font-medium text-gray-600 px-1 mb-1">{t.allTz}</p>
-                      <input className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder={t.timezoneSearch} value={tzSearch} onChange={e => setTzSearch(e.target.value)} />
-                      <div className="max-h-40 overflow-y-auto space-y-0.5">
-                        {filteredTz.map(tz => (
-                          <button key={tz.value} type="button" onClick={() => setForm({ ...form, confirmedTz: tz.value })}
-                            className={`w-full text-left px-3 py-1 rounded text-sm transition-colors ${form.confirmedTz === tz.value ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'}`}>
-                            {tz.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.countryLabel} *</label>
+                  {/* Region buttons */}
+                  <div className="flex gap-2 mb-3">
+                    <button type="button" onClick={() => switchRegion('israel')}
+                      className={`${regionBtnBase} ${countryRegion === 'israel' ? regionBtnActive : regionBtnInactive}`}>
+                      {t.regionIsrael}
+                    </button>
+                    <button type="button" onClick={() => switchRegion('usa')}
+                      className={`${regionBtnBase} ${countryRegion === 'usa' ? regionBtnActive : regionBtnInactive}`}>
+                      {t.regionUSA}
+                    </button>
+                    <button type="button" onClick={() => switchRegion('europe')}
+                      className={`${regionBtnBase} ${countryRegion === 'europe' ? regionBtnActive : regionBtnInactive}`}>
+                      {t.regionEurope}
+                    </button>
                   </div>
-                  {form.confirmedTz && <p className="text-xs text-green-600 mt-1">✓ {form.confirmedTz}</p>}
-                  {errors.confirmedTz && <p className="text-red-500 text-xs mt-1">{errors.confirmedTz}</p>}
+
+                  {/* USA states */}
+                  {countryRegion === 'usa' && (
+                    <div className={`border rounded-lg overflow-hidden ${errors.country ? 'border-red-400' : 'border-gray-200'}`}>
+                      <div className="max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        {USA_STATES.map(s => (
+                          <button key={s.name} type="button" onClick={() => selectUSAState(s)}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors ${form.country === s.name ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Europe countries */}
+                  {countryRegion === 'europe' && (
+                    <div className={`border rounded-lg overflow-hidden ${errors.country ? 'border-red-400' : 'border-gray-200'}`}>
+                      <div className="max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        {EUROPE_COUNTRIES.map(c => (
+                          <button key={c.name} type="button" onClick={() => selectEuropeCountry(c)}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors ${form.country === c.name ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Confirmation */}
+                  {form.country && form.confirmedTz && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <span>✓</span>
+                      <span><strong>{form.country}</strong> — {t.tzAutoSet} ({form.confirmedTz})</span>
+                    </div>
+                  )}
+                  {errors.country && <p className="text-red-500 text-xs mt-1">{errors.country}</p>}
+                  {errors.confirmedTz && !errors.country && <p className="text-red-500 text-xs mt-1">{errors.confirmedTz}</p>}
                 </div>
 
                 <button onClick={handleNext} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
@@ -455,7 +624,24 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
             {step === 3 && (
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-1">{t.availTitle}</p>
-                <p className="text-xs text-gray-400 mb-4">{t.availSubtitle}</p>
+                <p className="text-xs text-gray-400 mb-3">{t.availSubtitle}</p>
+
+                {/* Tips */}
+                <div className="mb-4 space-y-2">
+                  <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                    <span className="shrink-0 mt-0.5">💡</span>
+                    <span>{t.availTipMore}</span>
+                  </div>
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                    <span className="shrink-0 mt-0.5">🏫</span>
+                    <span>{t.availTipSchool}</span>
+                  </div>
+                  <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-800">
+                    <span className="shrink-0 mt-0.5">✅</span>
+                    <span>{t.availTipNoCommitment}</span>
+                  </div>
+                </div>
+
                 <p className="text-xs text-blue-600 mb-4">{selectedSlots.size} {t.slotsSelected}</p>
                 <div className="overflow-x-auto">
                   <div className="grid grid-cols-8 gap-0.5 min-w-max">
@@ -463,7 +649,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                     {DAY_LABELS[lang].map((d, i) => (
                       <div key={i} className="text-xs font-medium text-gray-600 text-center pb-2">{d}</div>
                     ))}
-                    {Array.from({ length: (23 - 6) * 2 }, (_, idx) => {
+                    {Array.from({ length: (23 - 6) * 2 + 1 }, (_, idx) => {
                       const totalMins = 6 * 60 + idx * 30
                       const h = Math.floor(totalMins / 60)
                       const m = totalMins % 60
@@ -483,6 +669,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                     }).flat()}
                   </div>
                 </div>
+
                 {/* Privacy notice + consent */}
                 <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 space-y-3">
                   <p className="font-semibold text-gray-800 text-sm">{t.privacyTitle}</p>

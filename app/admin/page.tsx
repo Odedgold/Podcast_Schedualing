@@ -132,6 +132,8 @@ export default function AdminDashboard() {
   const [schoolSideB, setSchoolSideB] = useState<string[]>([])
   // Calendar popup
   const [calendarPopup, setCalendarPopup] = useState<{ participant: Participant; x: number; y: number } | null>(null)
+  // Participant detail modal
+  const [detailParticipant, setDetailParticipant] = useState<Participant | null>(null)
 
   const [matchResult, setMatchResult] = useState<{ matchesCreated: number; unmatchedCount: number; unmatched: { id: string; fullName: string; schoolName: string; country: string; warnings: string[]; blockers: string[] }[] } | null>(null)
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({})
@@ -340,7 +342,17 @@ export default function AdminDashboard() {
   async function deleteParticipant(p: Participant) {
     if (!confirm(`Permanently delete ${p.fullName}?\nThis cannot be undone (GDPR right to erasure).`)) return
     await fetch(`/api/admin/participants/${p.id}`, { method: 'DELETE' })
+    if (detailParticipant?.id === p.id) setDetailParticipant(null)
     fetchParticipants()
+  }
+
+  async function deleteAllParticipants() {
+    const programName = programs.find(p => p.id === selectedProgramId)?.name ?? 'this program'
+    if (!confirm(`Delete ALL participants and matches in "${programName}"?\n\nThis cannot be undone.`)) return
+    const url = selectedProgramId ? `/api/admin/participants?programId=${selectedProgramId}` : '/api/admin/participants'
+    await fetch(url, { method: 'DELETE' })
+    fetchParticipants()
+    fetchMatches()
   }
 
   async function toggleParticipantStatus(p: Participant) {
@@ -541,6 +553,12 @@ export default function AdminDashboard() {
                 >
                   Export Excel
                 </button>
+                <button
+                  onClick={deleteAllParticipants}
+                  className="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-1.5 rounded-lg"
+                >
+                  Delete All
+                </button>
               </div>
             </div>
 
@@ -573,10 +591,8 @@ export default function AdminDashboard() {
                     <thead>
                       <tr className="border-b border-gray-100 text-left">
                         <th className="px-4 py-3 font-medium text-gray-600">Name</th>
-                        <th className="px-4 py-3 font-medium text-gray-600">Email</th>
                         <th className="px-4 py-3 font-medium text-gray-600">School</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Country</th>
-                        <th className="px-4 py-3 font-medium text-gray-600">Timezone</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Status</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Slots</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Submitted</th>
@@ -587,11 +603,13 @@ export default function AdminDashboard() {
                     <tbody>
                       {filteredParticipants.map((p) => (
                         <tr key={p.id} className={`border-b border-gray-50 hover:bg-gray-50 ${p.status === 'INACTIVE' ? 'opacity-50' : ''}`}>
-                          <td className="px-4 py-3 font-medium text-gray-900">{p.fullName || '(empty)'}</td>
-                          <td className="px-4 py-3 text-gray-600">{p.email}</td>
+                          <td className="px-4 py-3">
+                            <button onClick={() => setDetailParticipant(p)} className="font-medium text-blue-600 hover:underline text-left">
+                              {p.fullName || '(empty)'}
+                            </button>
+                          </td>
                           <td className="px-4 py-3 text-gray-600">{p.schoolName}</td>
                           <td className="px-4 py-3 text-gray-600">{p.country}</td>
-                          <td className="px-4 py-3 text-gray-600 text-xs">{p.confirmedTz}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               p.status === 'MATCHED' ? 'bg-green-100 text-green-700' :
@@ -1475,6 +1493,102 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* ── Participant Detail Modal ── */}
+      {detailParticipant && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={() => setDetailParticipant(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">{detailParticipant.fullName}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Submitted {DateTime.fromISO(detailParticipant.submittedAt).toFormat('dd MMM yyyy, HH:mm')}</p>
+              </div>
+              <button onClick={() => setDetailParticipant(null)} className="text-gray-400 hover:text-gray-600 text-xl font-light">✕</button>
+            </div>
+
+            <div className="px-6 py-4 space-y-6">
+              {/* Personal info */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Personal Information</h3>
+                <table className="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
+                  <tbody className="divide-y divide-gray-100">
+                    {[
+                      ['Full Name', detailParticipant.fullName],
+                      ['Email', detailParticipant.email],
+                      ['Phone', detailParticipant.phone || '—'],
+                      ['School', detailParticipant.schoolName],
+                      ['City', detailParticipant.city],
+                      ['Country', detailParticipant.country],
+                      ['Timezone', detailParticipant.confirmedTz],
+                      ['Status', detailParticipant.status],
+                      ['Availability Slots', String(detailParticipant.availability.length)],
+                    ].map(([label, value]) => (
+                      <tr key={label} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-600 w-40">{label}</td>
+                        <td className="px-4 py-2.5 text-gray-900">{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Custom fields */}
+              {detailParticipant.customFields && detailParticipant.customFields.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Questionnaire Answers</h3>
+                  <table className="w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
+                    <tbody className="divide-y divide-gray-100">
+                      {detailParticipant.customFields.map((cf) => (
+                        <tr key={cf.field.label} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 font-medium text-gray-600 w-40">{parseFieldLabel(cf.field.label)}</td>
+                          <td className="px-4 py-2.5 text-gray-900">{cf.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Availability */}
+              {detailParticipant.availability && detailParticipant.availability.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Availability ({detailParticipant.availability.length} slots)</h3>
+                  <div className="border border-gray-100 rounded-lg overflow-hidden">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, dayIdx) => {
+                      const slots = detailParticipant.availability.filter(s => s.dayOfWeek === dayIdx)
+                      if (slots.length === 0) return null
+                      return (
+                        <div key={day} className="flex items-start gap-3 px-4 py-2.5 border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                          <span className="text-xs font-semibold text-gray-500 w-8 pt-0.5">{day}</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {slots.map(s => (
+                              <span key={s.id} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">{s.startTime}–{s.endTime}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-between pt-2 border-t border-gray-100">
+                <button
+                  onClick={() => { deleteParticipant(detailParticipant) }}
+                  className="text-sm text-red-500 hover:text-red-700 px-3 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+                >
+                  Delete (GDPR erasure)
+                </button>
+                <button onClick={() => setDetailParticipant(null)} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

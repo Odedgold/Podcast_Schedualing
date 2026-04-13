@@ -19,9 +19,13 @@ function nextOccurrence(utcDayOfWeek: number, utcTimeStr: string): Date {
 function slotToUtcMinutes(slot: { dayOfWeek: number; startTime: string; endTime: string }, tz: string) {
   const [sh, sm] = slot.startTime.split(':').map(Number)
   const [eh, em] = slot.endTime.split(':').map(Number)
-  const now = DateTime.now()
-  const base = DateTime.fromObject({ year: now.year, month: now.month, day: 7 + slot.dayOfWeek, hour: sh, minute: sm }, { zone: tz }).toUTC()
-  const baseEnd = DateTime.fromObject({ year: now.year, month: now.month, day: 7 + slot.dayOfWeek, hour: eh, minute: em }, { zone: tz }).toUTC()
+  // Map JS dayOfWeek (0=Sun) to Luxon ISO weekday (1=Mon … 7=Sun)
+  const luxonWeekday = slot.dayOfWeek === 0 ? 7 : slot.dayOfWeek
+  // Use actual calendar date of the target weekday in the current week
+  // so that DST offset is correct for the current time of year
+  const refDay = DateTime.utc().set({ weekday: luxonWeekday as 1|2|3|4|5|6|7 })
+  const base = DateTime.fromObject({ year: refDay.year, month: refDay.month, day: refDay.day, hour: sh, minute: sm }, { zone: tz }).toUTC()
+  const baseEnd = DateTime.fromObject({ year: refDay.year, month: refDay.month, day: refDay.day, hour: eh, minute: em }, { zone: tz }).toUTC()
   const utcDay = base.weekday === 7 ? 0 : base.weekday
   return { dayOfWeek: utcDay, startMin: base.hour * 60 + base.minute, endMin: baseEnd.hour * 60 + baseEnd.minute }
 }

@@ -81,6 +81,7 @@ model Participant {
   updatedAt        DateTime          @updatedAt
   program          Program?          @relation(fields: [programId], references: [id])
   programId        String?
+  @@index([programId])
   // All other data lives in customFields
   customFields     CustomFieldResponse[]
   availability     AvailabilitySlot[]
@@ -101,6 +102,7 @@ model CustomFieldResponse {
   fieldId       String
   value         String
   @@unique([participantId, fieldId])
+  @@index([fieldId])
 }
 
 model AvailabilitySlot {
@@ -148,7 +150,7 @@ model MatchMember {
   id            String      @id @default(cuid())
   match         Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
   matchId       String
-  participant   Participant @relation(fields: [participantId], references: [id])
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
   participantId String
   role          MemberRole  @default(PARTICIPANT)
   @@unique([matchId, participantId])

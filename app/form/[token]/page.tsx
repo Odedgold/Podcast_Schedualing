@@ -105,6 +105,12 @@ const EUROPE_COUNTRIES: { name: string; tz: string }[] = [
   { name: 'United Kingdom', tz: 'Europe/London' },
 ]
 
+const AUSTRALIA_CITIES: { name: string; tz: string }[] = [
+  { name: 'Sydney', tz: 'Australia/Sydney' },
+  { name: 'Melbourne', tz: 'Australia/Melbourne' },
+  { name: 'Perth', tz: 'Australia/Perth' },
+]
+
 // ── Translations ──────────────────────────────────────────────────────────────
 
 const DAY_LABELS: Record<Lang, string[]> = {
@@ -123,6 +129,7 @@ const T: Record<Lang, Record<string, string>> = {
     regionIsrael: '🇮🇱  Israel',
     regionUSA: '🇺🇸  USA',
     regionEurope: '🇪🇺  Europe',
+    regionAustralia: '🇦🇺  Australia',
     selectState: 'Select your state...',
     selectCountry: 'Select your country...',
     tzAutoSet: 'Timezone set automatically based on your location',
@@ -137,8 +144,11 @@ const T: Record<Lang, Record<string, string>> = {
     required: 'This field is required', invalidEmail: 'Please enter a valid email',
     noQuestions: 'No additional questions for this program.',
     selectOption: 'Select an option...',
+    selectSchool: '— Select school —',
+    schoolOther: 'Other...',
+    schoolOtherPlaceholder: 'Enter school name',
     privacyTitle: 'Privacy Notice',
-    privacyText: 'We collect your name, email, school, and availability solely to schedule program sessions. Your data is stored securely, used only for this program, and will be deleted at its conclusion. You have the right to access, correct, or request deletion of your data by contacting the program coordinator.',
+    privacyText: 'We collect your name, email, phone number (optional), school, city, country, timezone, and weekly availability solely to schedule program sessions. Your data is stored securely, used only for this program, and will be deleted at its conclusion. You have the right to access, correct, or request deletion of your data by contacting the program coordinator.',
     consentLabel: 'I have read the privacy notice and agree to the processing of my personal data for the purposes of this program.',
     consentRequired: 'You must accept the privacy notice to continue.',
   },
@@ -151,6 +161,7 @@ const T: Record<Lang, Record<string, string>> = {
     regionIsrael: '🇮🇱  ישראל',
     regionUSA: '🇺🇸  ארה״ב',
     regionEurope: '🇪🇺  אירופה',
+    regionAustralia: '🇦🇺  אוסטרליה',
     selectState: 'בחר מדינה (State)...',
     selectCountry: 'בחר מדינה...',
     tzAutoSet: 'אזור הזמן הוגדר אוטומטית לפי המיקום שבחרת',
@@ -165,8 +176,11 @@ const T: Record<Lang, Record<string, string>> = {
     required: 'שדה זה הוא חובה', invalidEmail: 'נא להזין כתובת אימייל תקינה',
     noQuestions: 'אין שאלות נוספות לתוכנית זו.',
     selectOption: 'בחר אפשרות...',
+    selectSchool: '— בחר בית ספר —',
+    schoolOther: 'אחר...',
+    schoolOtherPlaceholder: 'הכנס שם בית הספר',
     privacyTitle: 'הודעת פרטיות',
-    privacyText: 'אנו אוספים את שמך, אימייל, בית הספר וזמינות אך ורק לצורך תיאום מפגשי התוכנית. הנתונים שלך מאוחסנים בצורה מאובטחת, ישמשו לתוכנית זו בלבד, ויימחקו בתום הפעילות. יש לך זכות לעיין, לתקן או לבקש מחיקת הנתונים שלך על ידי פנייה לרכז התוכנית.',
+    privacyText: 'אנו אוספים את שמך, אימייל, מספר טלפון (אופציונלי), בית ספר, עיר, מדינה, אזור זמן וזמינות שבועית אך ורק לצורך תיאום מפגשי התוכנית. הנתונים שלך מאוחסנים בצורה מאובטחת, ישמשו לתוכנית זו בלבד, ויימחקו בתום הפעילות. יש לך זכות לעיין, לתקן או לבקש מחיקת הנתונים שלך על ידי פנייה לרכז התוכנית.',
     consentLabel: 'קראתי את הודעת הפרטיות ואני מסכים/ה לעיבוד הנתונים האישיים שלי לצורכי תוכנית זו.',
     consentRequired: 'יש לאשר את הודעת הפרטיות כדי להמשיך.',
   },
@@ -179,6 +193,7 @@ const T: Record<Lang, Record<string, string>> = {
     regionIsrael: '🇮🇱  Israel',
     regionUSA: '🇺🇸  EE.UU.',
     regionEurope: '🇪🇺  Europa',
+    regionAustralia: '🇦🇺  Australia',
     selectState: 'Selecciona tu estado...',
     selectCountry: 'Selecciona tu país...',
     tzAutoSet: 'Zona horaria configurada automáticamente según tu ubicación',
@@ -193,8 +208,11 @@ const T: Record<Lang, Record<string, string>> = {
     required: 'Este campo es obligatorio', invalidEmail: 'Por favor ingresa un correo válido',
     noQuestions: 'No hay preguntas adicionales para este programa.',
     selectOption: 'Selecciona una opción...',
+    selectSchool: '— Selecciona escuela —',
+    schoolOther: 'Otra...',
+    schoolOtherPlaceholder: 'Ingresa el nombre de la escuela',
     privacyTitle: 'Aviso de Privacidad',
-    privacyText: 'Recopilamos tu nombre, correo, escuela y disponibilidad únicamente para programar las sesiones del programa. Tus datos se almacenan de forma segura, se usarán solo para este programa y se eliminarán al finalizar. Tienes derecho a acceder, corregir o solicitar la eliminación de tus datos contactando al coordinador del programa.',
+    privacyText: 'Recopilamos tu nombre, correo, número de teléfono (opcional), escuela, ciudad, país, zona horaria y disponibilidad semanal únicamente para programar las sesiones del programa. Tus datos se almacenan de forma segura, se usarán solo para este programa y se eliminarán al finalizar. Tienes derecho a acceder, corregir o solicitar la eliminación de tus datos contactando al coordinador del programa.',
     consentLabel: 'He leído el aviso de privacidad y acepto el tratamiento de mis datos personales para los fines de este programa.',
     consentRequired: 'Debes aceptar el aviso de privacidad para continuar.',
   },
@@ -213,8 +231,8 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   const [schoolOther, setSchoolOther] = useState(false)
   const [fieldDefs, setFieldDefs] = useState<FieldDef[]>([])
   const [consentGiven, setConsentGiven] = useState(false)
-  // Country/region selection: israel | usa | europe
-  const [countryRegion, setCountryRegion] = useState<'israel' | 'usa' | 'europe' | null>(null)
+  // Country/region selection: israel | usa | europe | australia
+  const [countryRegion, setCountryRegion] = useState<'israel' | 'usa' | 'europe' | 'australia' | null>(null)
 
   const t = T[lang]
   const isRtl = lang === 'he'
@@ -265,7 +283,12 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     setErrors(prev => { const n = { ...prev }; delete n.country; delete n.confirmedTz; return n })
   }
 
-  function switchRegion(region: 'israel' | 'usa' | 'europe') {
+  function selectAustraliaCity(city: { name: string; tz: string }) {
+    setForm(f => ({ ...f, country: `Australia (${city.name})`, confirmedTz: city.tz }))
+    setErrors(prev => { const n = { ...prev }; delete n.country; delete n.confirmedTz; return n })
+  }
+
+  function switchRegion(region: 'israel' | 'usa' | 'europe' | 'australia') {
     setCountryRegion(region)
     // Clear previous country/tz selection when switching region
     if (region !== countryRegion) {
@@ -510,13 +533,13 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                           if (e.target.value === '__other__') { setSchoolOther(true); setForm({ ...form, schoolName: '' }) }
                           else { setSchoolOther(false); setForm({ ...form, schoolName: e.target.value }) }
                         }}>
-                        <option value="">— Select school —</option>
+                        <option value="">{t.selectSchool}</option>
                         {schoolList.map(s => <option key={s} value={s}>{s}</option>)}
-                        <option value="__other__">Other...</option>
+                        <option value="__other__">{t.schoolOther}</option>
                       </select>
                       {schoolOther && (
                         <input className={`mt-2 w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.schoolName ? 'border-red-400' : 'border-gray-300'}`}
-                          placeholder="Enter school name" value={form.schoolName}
+                          placeholder={t.schoolOtherPlaceholder} value={form.schoolName}
                           onChange={e => setForm({ ...form, schoolName: e.target.value })} />
                       )}
                     </>
@@ -552,6 +575,10 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                       className={`${regionBtnBase} ${countryRegion === 'europe' ? regionBtnActive : regionBtnInactive}`}>
                       {t.regionEurope}
                     </button>
+                    <button type="button" onClick={() => switchRegion('australia')}
+                      className={`${regionBtnBase} ${countryRegion === 'australia' ? regionBtnActive : regionBtnInactive}`}>
+                      {t.regionAustralia}
+                    </button>
                   </div>
 
                   {/* USA states */}
@@ -562,6 +589,20 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                           <button key={s.name} type="button" onClick={() => selectUSAState(s)}
                             className={`w-full text-left px-4 py-2 text-sm transition-colors ${form.country === s.name ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
                             {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Australia cities */}
+                  {countryRegion === 'australia' && (
+                    <div className={`border rounded-lg overflow-hidden ${errors.country ? 'border-red-400' : 'border-gray-200'}`}>
+                      <div className="divide-y divide-gray-100">
+                        {AUSTRALIA_CITIES.map(c => (
+                          <button key={c.name} type="button" onClick={() => selectAustraliaCity(c)}
+                            className={`w-full text-left px-4 py-2 text-sm transition-colors ${form.country === `Australia (${c.name})` ? 'bg-blue-600 text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
+                            {c.name}
                           </button>
                         ))}
                       </div>

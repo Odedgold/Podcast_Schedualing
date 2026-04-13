@@ -411,10 +411,34 @@ export default function AdminDashboard() {
 
   const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+  const ISRAEL_TZ = 'Asia/Jerusalem'
+
+  function slotToIsraelTime(slot: AvailabilitySlot, fromTz: string): { dayOfWeek: number; startTime: string; endTime: string } {
+    const luxonWeekday = slot.dayOfWeek === 0 ? 7 : slot.dayOfWeek
+    const refDay = DateTime.utc().set({ weekday: luxonWeekday as 1|2|3|4|5|6|7 })
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const [sh, sm] = slot.startTime.split(':').map(Number)
+    const [eh, em] = slot.endTime.split(':').map(Number)
+    const start = DateTime.fromObject(
+      { year: refDay.year, month: refDay.month, day: refDay.day, hour: sh, minute: sm },
+      { zone: fromTz }
+    ).setZone(ISRAEL_TZ)
+    const end = DateTime.fromObject(
+      { year: refDay.year, month: refDay.month, day: refDay.day, hour: eh, minute: em },
+      { zone: fromTz }
+    ).setZone(ISRAEL_TZ)
+    const startDay = start.weekday === 7 ? 0 : start.weekday
+    return {
+      dayOfWeek: startDay,
+      startTime: `${pad(start.hour)}:${pad(start.minute)}`,
+      endTime: `${pad(end.hour)}:${pad(end.minute)}`,
+    }
+  }
+
   const timeSlots: string[] = []
-  for (let h = 6; h <= 23; h++) {
+  for (let h = 0; h <= 23; h++) {
     timeSlots.push(`${String(h).padStart(2, '0')}:00`)
-    if (h < 23) timeSlots.push(`${String(h).padStart(2, '0')}:30`)
+    timeSlots.push(`${String(h).padStart(2, '0')}:30`)
   }
 
   const uniqueSchoolsList = [...new Set(participants.map((p) => p.schoolName))].sort()
@@ -436,7 +460,10 @@ export default function AdminDashboard() {
   function isSlotOccupied(participantId: string, dayOfWeek: number, time: string) {
     const p = participants.find((pp) => pp.id === participantId)
     if (!p) return false
-    return p.availability.some((slot) => slot.dayOfWeek === dayOfWeek && slot.startTime === time)
+    return p.availability.some((slot) => {
+      const il = slotToIsraelTime(slot, p.confirmedTz)
+      return il.dayOfWeek === dayOfWeek && il.startTime === time
+    })
   }
 
   function toggleGroup(ids: string[]) {
@@ -770,6 +797,9 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Calendar grid */}
+                <div className="text-xs text-gray-400 mb-1 px-1">
+                  Calendar shows Israel Time (IST/IDT — Asia/Jerusalem)
+                </div>
                 <div className="bg-white rounded-xl border border-gray-200 overflow-auto relative">
                   <div className="flex min-w-max">
                     <div className="sticky left-0 bg-white z-10 border-r border-gray-200">
@@ -1424,30 +1454,144 @@ export default function AdminDashboard() {
                   Approved ({approvedMatches.length})
                 </h3>
                 <div className="space-y-3">
-                  {approvedMatches.map((match) => (
-                    <div key={match.id} className="bg-white rounded-xl border border-green-200 overflow-hidden">
-                      <div className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="text-xs text-green-600 font-bold">✓</span>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.matchType === 'PAIR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                            {match.matchType}
-                          </span>
-                          <span className="text-sm font-medium text-gray-900 truncate">
-                            {match.members.map(mm => mm.participant.fullName).join(' + ')}
-                          </span>
-                          <span className="text-xs text-gray-400 shrink-0">
-                            {utcToIst(match.scheduledStartUtc)} IST
-                          </span>
+                  {approvedMatches.map((match) => {
+                    const isExpanded = expandedMatch === match.id
+                    const members = match.members.map(mm => mm.participant)
+                    return (
+                      <div key={match.id} className="bg-white rounded-xl border border-green-200 overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <button className="flex items-center gap-2 flex-1 min-w-0 text-left" onClick={() => setExpandedMatch(isExpanded ? null : match.id)}>
+                            <span className={`text-gray-400 text-xs transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+                            <span className="text-xs text-green-600 font-bold">✓</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.matchType === 'PAIR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                              {match.matchType}
+                            </span>
+                            <span className="text-sm font-medium text-gray-900 truncate">
+                              {members.map(m => m.fullName).join(' + ')}
+                            </span>
+                            <span className="text-xs text-gray-400 shrink-0">
+                              {utcToIst(match.scheduledStartUtc)} IST
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => breakMatch(match.id)}
+                            className="shrink-0 ml-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-500 text-xs px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Break
+                          </button>
                         </div>
-                        <button
-                          onClick={() => breakMatch(match.id)}
-                          className="shrink-0 ml-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-500 text-xs px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          Break
-                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t border-gray-100 px-4 py-3 space-y-4 bg-gray-50">
+                            {/* Date & Time */}
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Date & Time (Israel time)</p>
+                              <p className="text-sm text-gray-800 font-medium">
+                                {utcToIst(match.scheduledStartUtc)} – {DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone('Asia/Jerusalem').toFormat('HH:mm')} IST
+                              </p>
+                            </div>
+
+                            {/* Participants details + availability */}
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Participants & Availability</p>
+                              <div className="grid grid-cols-1 gap-2">
+                                {match.members.map((mm) => {
+                                  const p = mm.participant as Participant & { availability: AvailabilitySlot[] }
+                                  const matchLocal = DateTime.fromISO(match.scheduledStartUtc, { zone: 'utc' }).setZone(p.confirmedTz)
+                                  const matchEndLocal = DateTime.fromISO(match.scheduledEndUtc, { zone: 'utc' }).setZone(p.confirmedTz)
+                                  const matchLocalStr = `${matchLocal.toFormat('cccc, dd MMM HH:mm')} – ${matchEndLocal.toFormat('HH:mm')}`
+                                  return (
+                                    <div key={mm.role + p.id} className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                                      <div className="font-semibold text-gray-900 mb-0.5">{p.fullName} <span className="font-normal text-gray-400">· {p.schoolName} · {p.country}</span></div>
+                                      <div className="text-gray-400 mb-0.5">{p.confirmedTz}</div>
+                                      <div className="text-green-700 font-medium mb-1.5">📅 {matchLocalStr} (local)</div>
+                                      {p.availability && p.availability.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                          {p.availability.map((slot) => {
+                                            const isMatch = slot.dayOfWeek === matchLocal.weekday % 7 &&
+                                              slot.startTime <= matchLocal.toFormat('HH:mm') &&
+                                              slot.endTime >= matchEndLocal.toFormat('HH:mm')
+                                            return (
+                                              <span key={slot.id} className={`rounded px-1.5 py-0.5 text-[11px] border ${isMatch ? 'bg-green-100 border-green-400 text-green-800 font-semibold' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                                                {DAY_NAMES[slot.dayOfWeek]} {slot.startTime}–{slot.endTime}
+                                                {isMatch && ' ✓'}
+                                              </span>
+                                            )
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400 italic">No availability recorded</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Pros & Cons (PAIR only) */}
+                            {match.matchType === 'PAIR' && match.members.length === 2 && (() => {
+                              const pa = match.members[0].participant as Participant
+                              const pb = match.members[1].participant as Participant
+                              const { pros, cons } = computeProsAndCons(pa, pb)
+                              return (
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Pros & Cons</p>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-green-700 mb-1">Pros</p>
+                                      {pros.length === 0 && <p className="text-xs text-gray-400 italic">None</p>}
+                                      {pros.map((pro, i) => (
+                                        <div key={i} className="flex items-start gap-1 text-xs text-green-800 bg-green-50 border border-green-200 rounded px-2 py-1">
+                                          <span className="shrink-0">✓</span><span>{pro}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-red-700 mb-1">Cons</p>
+                                      {cons.length === 0 && <p className="text-xs text-gray-400 italic">None</p>}
+                                      {cons.map((con, i) => (
+                                        <div key={i} className="flex items-start gap-1 text-xs text-red-800 bg-red-50 border border-red-200 rounded px-2 py-1">
+                                          <span className="shrink-0">✗</span><span>{con}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })()}
+
+                            {/* System Notes */}
+                            {match.systemNotes && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">System Warnings</p>
+                                <div className="space-y-1">
+                                  {match.systemNotes.split(' | ').map((note, i) => (
+                                    <div key={i} className="flex items-start gap-1.5 text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                                      <span>⚠️</span><span>{note}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Admin Notes */}
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Admin Notes</p>
+                              <div className="flex gap-2">
+                                <input
+                                  className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  placeholder="Add a note..."
+                                  value={editingNotes[match.id] ?? match.adminNotes ?? ''}
+                                  onChange={(e) => setEditingNotes((n) => ({ ...n, [match.id]: e.target.value }))}
+                                />
+                                <button onClick={() => saveNotes(match.id)} className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">Save</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -1553,7 +1697,9 @@ export default function AdminDashboard() {
               {/* Availability */}
               {detailParticipant.availability && detailParticipant.availability.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Availability ({detailParticipant.availability.length} slots)</h3>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Availability ({detailParticipant.availability.length} slots) — local time + Israel time
+                  </h3>
                   <div className="border border-gray-100 rounded-lg overflow-hidden">
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, dayIdx) => {
                       const slots = detailParticipant.availability.filter(s => s.dayOfWeek === dayIdx)
@@ -1562,9 +1708,17 @@ export default function AdminDashboard() {
                         <div key={day} className="flex items-start gap-3 px-4 py-2.5 border-b border-gray-100 last:border-0 hover:bg-gray-50">
                           <span className="text-xs font-semibold text-gray-500 w-8 pt-0.5">{day}</span>
                           <div className="flex flex-wrap gap-1.5">
-                            {slots.map(s => (
-                              <span key={s.id} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">{s.startTime}–{s.endTime}</span>
-                            ))}
+                            {slots.map(s => {
+                              const il = slotToIsraelTime(s, detailParticipant.confirmedTz)
+                              const ilDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][il.dayOfWeek]
+                              const ilLabel = il.dayOfWeek !== dayIdx ? `${ilDay} ` : ''
+                              return (
+                                <span key={s.id} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">
+                                  {s.startTime}–{s.endTime}
+                                  <span className="text-blue-400 ml-1">({ilLabel}{il.startTime}–{il.endTime} IST)</span>
+                                </span>
+                              )
+                            })}
                           </div>
                         </div>
                       )

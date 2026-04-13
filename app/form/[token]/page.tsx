@@ -39,6 +39,10 @@ const T: Record<Lang, Record<string, string>> = {
     required: 'This field is required', invalidEmail: 'Please enter a valid email',
     noQuestions: 'No additional questions for this program.',
     selectOption: 'Select an option...',
+    privacyTitle: 'Privacy Notice',
+    privacyText: 'We collect your name, email, school, and availability solely to schedule program sessions. Your data is stored securely, used only for this program, and will be deleted at its conclusion. You have the right to access, correct, or request deletion of your data by contacting the program coordinator.',
+    consentLabel: 'I have read the privacy notice and agree to the processing of my personal data for the purposes of this program.',
+    consentRequired: 'You must accept the privacy notice to continue.',
   },
   he: {
     title: 'טופס הרשמה',
@@ -55,6 +59,10 @@ const T: Record<Lang, Record<string, string>> = {
     required: 'שדה זה הוא חובה', invalidEmail: 'נא להזין כתובת אימייל תקינה',
     noQuestions: 'אין שאלות נוספות לתוכנית זו.',
     selectOption: 'בחר אפשרות...',
+    privacyTitle: 'הודעת פרטיות',
+    privacyText: 'אנו אוספים את שמך, אימייל, בית הספר וזמינות אך ורק לצורך תיאום מפגשי התוכנית. הנתונים שלך מאוחסנים בצורה מאובטחת, ישמשו לתוכנית זו בלבד, ויימחקו בתום הפעילות. יש לך זכות לעיין, לתקן או לבקש מחיקת הנתונים שלך על ידי פנייה לרכז התוכנית.',
+    consentLabel: 'קראתי את הודעת הפרטיות ואני מסכים/ה לעיבוד הנתונים האישיים שלי לצורכי תוכנית זו.',
+    consentRequired: 'יש לאשר את הודעת הפרטיות כדי להמשיך.',
   },
   es: {
     title: 'Formulario de Registro',
@@ -71,6 +79,10 @@ const T: Record<Lang, Record<string, string>> = {
     required: 'Este campo es obligatorio', invalidEmail: 'Por favor ingresa un correo válido',
     noQuestions: 'No hay preguntas adicionales para este programa.',
     selectOption: 'Selecciona una opción...',
+    privacyTitle: 'Aviso de Privacidad',
+    privacyText: 'Recopilamos tu nombre, correo, escuela y disponibilidad únicamente para programar las sesiones del programa. Tus datos se almacenan de forma segura, se usarán solo para este programa y se eliminarán al finalizar. Tienes derecho a acceder, corregir o solicitar la eliminación de tus datos contactando al coordinador del programa.',
+    consentLabel: 'He leído el aviso de privacidad y acepto el tratamiento de mis datos personales para los fines de este programa.',
+    consentRequired: 'Debes aceptar el aviso de privacidad para continuar.',
   },
 }
 
@@ -85,6 +97,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   const [schoolList, setSchoolList] = useState<string[]>([])
   const [schoolOther, setSchoolOther] = useState(false)
   const [fieldDefs, setFieldDefs] = useState<FieldDef[]>([])
+  const [consentGiven, setConsentGiven] = useState(false)
 
   const t = T[lang]
   const isRtl = lang === 'he'
@@ -158,6 +171,10 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   }
 
   async function handleSubmit() {
+    if (!consentGiven) {
+      setErrors({ consent: t.consentRequired })
+      return
+    }
     setSubmitting(true)
     try {
       const availability = Array.from(selectedSlots).map((key) => {
@@ -466,7 +483,23 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                     }).flat()}
                   </div>
                 </div>
-                <div className="flex gap-3 mt-6">
+                {/* Privacy notice + consent */}
+                <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 space-y-3">
+                  <p className="font-semibold text-gray-800 text-sm">{t.privacyTitle}</p>
+                  <p className="leading-relaxed">{t.privacyText}</p>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={consentGiven}
+                      onChange={e => { setConsentGiven(e.target.checked); if (e.target.checked) setErrors(prev => { const n = { ...prev }; delete n.consent; return n }) }}
+                      className="mt-0.5 w-4 h-4 accent-blue-600 shrink-0"
+                    />
+                    <span className={errors.consent ? 'text-red-600' : ''}>{t.consentLabel}</span>
+                  </label>
+                  {errors.consent && <p className="text-red-500">{errors.consent}</p>}
+                </div>
+
+                <div className="flex gap-3 mt-4">
                   <button onClick={() => { setErrors({}); setStep(2) }}
                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition-colors">
                     ← {t.back}

@@ -316,6 +316,12 @@ export default function AdminDashboard() {
     window.location.href = '/admin/login'
   }
 
+  async function deleteParticipant(p: Participant) {
+    if (!confirm(`Permanently delete ${p.fullName}?\nThis cannot be undone (GDPR right to erasure).`)) return
+    await fetch(`/api/admin/participants/${p.id}`, { method: 'DELETE' })
+    fetchParticipants()
+  }
+
   async function toggleParticipantStatus(p: Participant) {
     if (p.status === 'MATCHED') return
     const next = p.status === 'INACTIVE' ? 'PENDING' : 'INACTIVE'
@@ -527,6 +533,7 @@ export default function AdminDashboard() {
                         <th className="px-4 py-3 font-medium text-gray-600">Slots</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Submitted</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Toggle</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Delete</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -557,6 +564,13 @@ export default function AdminDashboard() {
                                 {p.status === 'INACTIVE' ? 'Activate' : 'Deactivate'}
                               </button>
                             )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button onClick={() => deleteParticipant(p)}
+                              className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                              title="GDPR right to erasure">
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}

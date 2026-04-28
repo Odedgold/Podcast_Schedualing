@@ -187,18 +187,37 @@ export default function AdminDashboard() {
   }, [fetchParticipants, fetchCustomFields, fetchMatches, fetchSchools])
 
   function exportParticipantsToExcel() {
-    const data = participants.map((p) => ({
-      Name: p.fullName,
-      Email: p.email,
-      Phone: p.phone || '',
-      School: p.schoolName,
-      City: p.city,
-      Country: p.country,
-      Timezone: p.confirmedTz,
-      Status: p.status,
-      'Available Slots': p.availability.length,
-      Submitted: p.submittedAt,
-    }))
+    // Collect all custom field labels across all participants (preserving order)
+    const allFieldLabels: string[] = []
+    const seenLabels = new Set<string>()
+    for (const p of participants) {
+      for (const cf of p.customFields || []) {
+        const label = parseFieldLabel(cf.field.label)
+        if (!seenLabels.has(label)) { seenLabels.add(label); allFieldLabels.push(label) }
+      }
+    }
+
+    const data = participants.map((p) => {
+      const customFieldMap = Object.fromEntries(
+        (p.customFields || []).map((cf) => [parseFieldLabel(cf.field.label), cf.value])
+      )
+      const row: Record<string, string | number> = {
+        Name: p.fullName,
+        Email: p.email,
+        Phone: p.phone || '',
+        School: p.schoolName,
+        City: p.city,
+        Country: p.country,
+        Timezone: p.confirmedTz,
+        Status: p.status,
+        'Available Slots': p.availability.length,
+        Submitted: new Date(p.submittedAt).toLocaleString(),
+      }
+      for (const label of allFieldLabels) {
+        row[label] = customFieldMap[label] ?? ''
+      }
+      return row
+    })
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Participants')

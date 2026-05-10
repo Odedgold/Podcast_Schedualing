@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
       token,
       fullName,
       email,
+      parentEmail,
       phone,
       schoolName,
       city,
@@ -18,8 +19,13 @@ export async function POST(request: NextRequest) {
       customFields,
     } = body
 
-    if (!fullName || !email || !schoolName || !city || !country || !confirmedTz) {
+    if (!fullName || !email || !parentEmail || !schoolName || !city || !country || !confirmedTz) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRe.test(email) || !emailRe.test(parentEmail)) {
+      return Response.json({ error: 'Invalid email format' }, { status: 400 })
     }
 
     // Resolve which program this submission belongs to (token = program slug)
@@ -32,6 +38,7 @@ export async function POST(request: NextRequest) {
     const coreData = {
       fullName,
       email,
+      parentEmail,
       phone: phone || null,
       schoolName,
       city,

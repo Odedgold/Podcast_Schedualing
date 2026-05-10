@@ -123,7 +123,7 @@ const T: Record<Lang, Record<string, string>> = {
   en: {
     title: 'Registration Form',
     step1: 'Personal Info', step2: 'Questions', step3: 'Availability',
-    fullName: 'Full Name', email: 'Email', phone: 'Phone (optional)',
+    fullName: 'Full Name', email: 'Email', parentEmail: 'Parent Email', phone: 'Phone (optional)',
     school: 'School Name', city: 'City',
     countryLabel: 'Country / State',
     regionIsrael: '🇮🇱  Israel',
@@ -148,14 +148,14 @@ const T: Record<Lang, Record<string, string>> = {
     schoolOther: 'Other...',
     schoolOtherPlaceholder: 'Enter school name',
     privacyTitle: 'Privacy Notice',
-    privacyText: 'We collect your name, email, phone number (optional), school, city, country, timezone, and weekly availability solely to schedule program sessions. Your data is stored securely, used only for this program, and will be deleted at its conclusion. You have the right to access, correct, or request deletion of your data by contacting the program coordinator.',
+    privacyText: 'We collect your name, email, parent email, phone number (optional), school, city, country, timezone, and weekly availability solely to schedule program sessions and to obtain parental consent. Your data is stored securely, used only for this program, and will be deleted at its conclusion. You have the right to access, correct, or request deletion of your data by contacting the program coordinator.',
     consentLabel: 'I have read the privacy notice and agree to the processing of my personal data for the purposes of this program.',
     consentRequired: 'You must accept the privacy notice to continue.',
   },
   he: {
     title: 'טופס הרשמה',
     step1: 'פרטים אישיים', step2: 'שאלות', step3: 'זמינות',
-    fullName: 'שם מלא', email: 'אימייל', phone: 'טלפון (אופציונלי)',
+    fullName: 'שם מלא', email: 'אימייל', parentEmail: 'אימייל של ההורה', phone: 'טלפון (אופציונלי)',
     school: 'שם בית הספר', city: 'עיר',
     countryLabel: 'מדינה / מחוז',
     regionIsrael: '🇮🇱  ישראל',
@@ -180,14 +180,14 @@ const T: Record<Lang, Record<string, string>> = {
     schoolOther: 'אחר...',
     schoolOtherPlaceholder: 'הכנס שם בית הספר',
     privacyTitle: 'הודעת פרטיות',
-    privacyText: 'אנו אוספים את שמך, אימייל, מספר טלפון (אופציונלי), בית ספר, עיר, מדינה, אזור זמן וזמינות שבועית אך ורק לצורך תיאום מפגשי התוכנית. הנתונים שלך מאוחסנים בצורה מאובטחת, ישמשו לתוכנית זו בלבד, ויימחקו בתום הפעילות. יש לך זכות לעיין, לתקן או לבקש מחיקת הנתונים שלך על ידי פנייה לרכז התוכנית.',
+    privacyText: 'אנו אוספים את שמך, אימייל, אימייל של ההורה, מספר טלפון (אופציונלי), בית ספר, עיר, מדינה, אזור זמן וזמינות שבועית אך ורק לצורך תיאום מפגשי התוכנית וקבלת אישור הורים. הנתונים שלך מאוחסנים בצורה מאובטחת, ישמשו לתוכנית זו בלבד, ויימחקו בתום הפעילות. יש לך זכות לעיין, לתקן או לבקש מחיקת הנתונים שלך על ידי פנייה לרכז התוכנית.',
     consentLabel: 'קראתי את הודעת הפרטיות ואני מסכים/ה לעיבוד הנתונים האישיים שלי לצורכי תוכנית זו.',
     consentRequired: 'יש לאשר את הודעת הפרטיות כדי להמשיך.',
   },
   es: {
     title: 'Formulario de Registro',
     step1: 'Información Personal', step2: 'Preguntas', step3: 'Disponibilidad',
-    fullName: 'Nombre Completo', email: 'Correo Electrónico', phone: 'Teléfono (opcional)',
+    fullName: 'Nombre Completo', email: 'Correo Electrónico', parentEmail: 'Correo del Padre/Madre', phone: 'Teléfono (opcional)',
     school: 'Nombre de la Escuela', city: 'Ciudad',
     countryLabel: 'País / Estado',
     regionIsrael: '🇮🇱  Israel',
@@ -212,7 +212,7 @@ const T: Record<Lang, Record<string, string>> = {
     schoolOther: 'Otra...',
     schoolOtherPlaceholder: 'Ingresa el nombre de la escuela',
     privacyTitle: 'Aviso de Privacidad',
-    privacyText: 'Recopilamos tu nombre, correo, número de teléfono (opcional), escuela, ciudad, país, zona horaria y disponibilidad semanal únicamente para programar las sesiones del programa. Tus datos se almacenan de forma segura, se usarán solo para este programa y se eliminarán al finalizar. Tienes derecho a acceder, corregir o solicitar la eliminación de tus datos contactando al coordinador del programa.',
+    privacyText: 'Recopilamos tu nombre, correo, correo del padre/madre, número de teléfono (opcional), escuela, ciudad, país, zona horaria y disponibilidad semanal únicamente para programar las sesiones del programa y obtener el consentimiento parental. Tus datos se almacenan de forma segura, se usarán solo para este programa y se eliminarán al finalizar. Tienes derecho a acceder, corregir o solicitar la eliminación de tus datos contactando al coordinador del programa.',
     consentLabel: 'He leído el aviso de privacidad y acepto el tratamiento de mis datos personales para los fines de este programa.',
     consentRequired: 'Debes aceptar el aviso de privacidad para continuar.',
   },
@@ -238,7 +238,7 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
   const isRtl = lang === 'he'
 
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '',
+    fullName: '', email: '', parentEmail: '', phone: '',
     schoolName: '', city: '', country: '',
     confirmedTz: '', detectedTz: '',
   })
@@ -304,6 +304,8 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
     if (!form.fullName.trim()) e.fullName = t.required
     if (!form.email.trim()) e.email = t.required
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = t.invalidEmail
+    if (!form.parentEmail.trim()) e.parentEmail = t.required
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.parentEmail)) e.parentEmail = t.invalidEmail
     if (!form.schoolName.trim()) e.schoolName = t.required
     if (!form.city.trim()) e.city = t.required
     if (!form.country.trim()) e.country = t.required
@@ -514,6 +516,13 @@ export default function FormPage({ params }: { params: Promise<{ token: string }
                   <input type="email" className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? 'border-red-400' : 'border-gray-300'}`}
                     value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.parentEmail} *</label>
+                  <input type="email" className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.parentEmail ? 'border-red-400' : 'border-gray-300'}`}
+                    value={form.parentEmail} onChange={e => setForm({ ...form, parentEmail: e.target.value })} />
+                  {errors.parentEmail && <p className="text-red-500 text-xs mt-1">{errors.parentEmail}</p>}
                 </div>
 
                 <div>

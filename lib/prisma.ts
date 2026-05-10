@@ -7,10 +7,15 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL!
-  const adapter = new PrismaPg({ connectionString })
+  // max: 1 — each serverless instance opens a single pg connection.
+  // Combined with Supabase pgbouncer (transaction mode, port 6543), this prevents
+  // pool exhaustion under concurrent admin loads.
+  const adapter = new PrismaPg({ connectionString, max: 1 })
   return new PrismaClient({ adapter })
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+// Reuse the same client across hot-reloads in dev AND across warm serverless
+// invocations in production.
+globalForPrisma.prisma = prisma

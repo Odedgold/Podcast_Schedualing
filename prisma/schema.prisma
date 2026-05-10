@@ -70,6 +70,7 @@ model Participant {
   // Core fixed fields (always present)
   fullName         String
   email            String
+  parentEmail      String?
   phone            String?
   schoolName       String
   city             String

@@ -24,7 +24,7 @@ interface AvailabilitySlot {
 }
 
 interface CustomFieldResponse {
-  field: { label: string }
+  field: { label: string; fieldKey?: string }
   value: string
 }
 
@@ -426,6 +426,21 @@ export default function AdminDashboard() {
 
   function parseFieldLabel(raw: string): string {
     try { const p = JSON.parse(raw); return p.en ?? raw } catch { return raw }
+  }
+
+  function getCustomValue(p: Pick<Participant, 'customFields'>, fieldKey: string): string | undefined {
+    return p.customFields?.find((cf) => cf.field.fieldKey === fieldKey)?.value
+  }
+
+  function matchMemberExtras(p: Participant): string {
+    const grade = getCustomValue(p, 'grade')
+    const religion = getCustomValue(p, 'religiosity_level')
+    const gender = getCustomValue(p, 'gender')
+    const parts: string[] = []
+    if (grade) parts.push(`Grade ${grade}`)
+    if (gender) parts.push(gender)
+    if (religion) parts.push(religion)
+    return parts.join(' · ')
   }
 
   const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -1373,6 +1388,7 @@ export default function AdminDashboard() {
                                   return (
                                     <div key={mm.role + p.id} className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700">
                                       <div className="font-semibold text-gray-900 mb-0.5">{p.fullName} <span className="font-normal text-gray-400">· {p.schoolName} · {p.country}</span></div>
+                                      {matchMemberExtras(p) && <div className="text-gray-600 mb-0.5">{matchMemberExtras(p)}</div>}
                                       <div className="text-gray-400 mb-0.5">{p.confirmedTz}</div>
                                       <div className="text-green-700 font-medium mb-1.5">📅 {matchLocalStr} (local)</div>
                                       {p.availability && p.availability.length > 0 ? (
@@ -1522,6 +1538,7 @@ export default function AdminDashboard() {
                                   return (
                                     <div key={mm.role + p.id} className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700">
                                       <div className="font-semibold text-gray-900 mb-0.5">{p.fullName} <span className="font-normal text-gray-400">· {p.schoolName} · {p.country}</span></div>
+                                      {matchMemberExtras(p) && <div className="text-gray-600 mb-0.5">{matchMemberExtras(p)}</div>}
                                       <div className="text-gray-400 mb-0.5">{p.confirmedTz}</div>
                                       <div className="text-green-700 font-medium mb-1.5">📅 {matchLocalStr} (local)</div>
                                       {p.availability && p.availability.length > 0 ? (

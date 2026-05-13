@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
       where: programId ? { programId } : {},
       include: {
         availability: { orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] },
-        customFields: { include: { field: { select: { label: true } } } },
+        customFields: { include: { field: { select: { label: true, fieldKey: true } } } },
       },
       orderBy: { submittedAt: 'desc' },
     })

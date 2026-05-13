@@ -140,6 +140,53 @@ function scoreAndValidatePair(
   return { valid, score, overlap }
 }
 
+// Check whether `newMember` satisfies all MANDATORY rules against every existing
+// group member. Mirrors the pair-side checks in scoreAndValidatePair so groups
+// don't silently violate rules the admin set as MANDATORY.
+function memberPassesMandatory(
+  newMember: ParticipantData,
+  existing: ParticipantData[],
+  fieldDefs: FieldDef[],
+  differentSchoolRule: RuleMode,
+  differentCountryRule: RuleMode,
+): boolean {
+  for (const m of existing) {
+    if (differentSchoolRule === 'mandatory' && m.schoolName === newMember.schoolName) return false
+    if (differentCountryRule === 'mandatory' && m.country === newMember.country) return false
+    for (const fd of fieldDefs) {
+      if (fd.matchingMode !== 'MANDATORY') continue
+      const valA = newMember.customValues[fd.id]
+      const valB = m.customValues[fd.id]
+      if (!fieldMatches(valA, valB, fd.fieldType, fd.matchingType, fd.matchingWeight)) return false
+    }
+  }
+  return true
+}
+
+// Aggregate PREFERRED-rule contributions across every pair in the group so the
+// matcher can pick the highest-scoring valid group instead of the first found.
+function scoreGroup(
+  members: ParticipantData[],
+  fieldDefs: FieldDef[],
+  differentSchoolRule: RuleMode,
+  differentCountryRule: RuleMode,
+): number {
+  let score = 0
+  for (let a = 0; a < members.length; a++) {
+    for (let b = a + 1; b < members.length; b++) {
+      if (differentSchoolRule === 'preferred' && members[a].schoolName !== members[b].schoolName) score += 5
+      if (differentCountryRule === 'preferred' && members[a].country !== members[b].country) score += 5
+      for (const fd of fieldDefs) {
+        if (fd.matchingMode !== 'PREFERRED') continue
+        const valA = members[a].customValues[fd.id]
+        const valB = members[b].customValues[fd.id]
+        if (fieldMatches(valA, valB, fd.fieldType, fd.matchingType, fd.matchingWeight)) score += fd.matchingWeight
+      }
+    }
+  }
+  return score
+}
+
 function generateSystemNotes(
   a: ParticipantData,
   b: ParticipantData,
@@ -241,57 +288,58 @@ export async function POST(request: NextRequest) {
     if (matchType === 'PAIR' || matchType === 'BOTH') {
       const matched = matchedParticipantIds
 
+      // Enumerate all VALID pairs with scores, sort by score descending, then take
+      // greedily. This is a 1/2-approximation of maximum-weight matching; strictly
+      // better than the prior left-to-right greedy, which could strand participants
+      // whose only viable partner had already been claimed.
+      type PairCandidate = {
+        i: number
+        j: number
+        score: number
+        overlap: ReturnType<typeof findAvailabilityOverlap>
+      }
+      const pairCandidates: PairCandidate[] = []
       for (let i = 0; i < eligible.length; i++) {
-        if (matched.has(eligible[i].id)) continue
-
-        let bestScore = -1
-        let bestJ = -1
-        let bestOverlap: ReturnType<typeof findAvailabilityOverlap> = null
-
         for (let j = i + 1; j < eligible.length; j++) {
-          if (matched.has(eligible[j].id)) continue
           const sideI = eligible[i].side
           const sideJ = eligible[j].side
           if (sideI !== 'both' && sideJ !== 'both' && sideI === sideJ) continue
-
           const { valid, score, overlap } = scoreAndValidatePair(
             eligible[i], eligible[j], fieldDefs,
             availabilityRule, differentSchoolRule, differentCountryRule,
           )
-          if (valid && score > bestScore) {
-            bestScore = score
-            bestJ = j
-            bestOverlap = overlap
-          }
+          if (valid) pairCandidates.push({ i, j, score, overlap })
         }
+      }
+      pairCandidates.sort((a, b) => b.score - a.score)
 
-        if (bestJ !== -1) {
-          const overlap = bestOverlap || findAvailabilityOverlap(eligible[i].availability, eligible[i].confirmedTz, eligible[bestJ].availability, eligible[bestJ].confirmedTz)
-          const startUtc = overlap ? nextOccurrence(overlap.dayOfWeek, overlap.startTime) : new Date()
-          const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
-          const sysNotes = generateSystemNotes(eligible[i], eligible[bestJ], fieldDefs, differentCountryRule)
+      for (const c of pairCandidates) {
+        if (matched.has(eligible[c.i].id) || matched.has(eligible[c.j].id)) continue
 
-          const match = await prisma.match.create({
-            data: {
-              matchType: 'PAIR',
-              scheduledStartUtc: startUtc,
-              scheduledEndUtc: endUtc,
-              systemNotes: sysNotes || null,
-              programId: programId ?? null,
-              members: {
-                create: [
-                  { participantId: eligible[i].id },
-                  { participantId: eligible[bestJ].id },
-                ],
-              },
+        const overlap = c.overlap || findAvailabilityOverlap(eligible[c.i].availability, eligible[c.i].confirmedTz, eligible[c.j].availability, eligible[c.j].confirmedTz)
+        const startUtc = overlap ? nextOccurrence(overlap.dayOfWeek, overlap.startTime) : new Date()
+        const endUtc = new Date(startUtc.getTime() + 30 * 60 * 1000)
+        const sysNotes = generateSystemNotes(eligible[c.i], eligible[c.j], fieldDefs, differentCountryRule)
+
+        const match = await prisma.match.create({
+          data: {
+            matchType: 'PAIR',
+            scheduledStartUtc: startUtc,
+            scheduledEndUtc: endUtc,
+            systemNotes: sysNotes || null,
+            programId: programId ?? null,
+            members: {
+              create: [
+                { participantId: eligible[c.i].id },
+                { participantId: eligible[c.j].id },
+              ],
             },
-          })
-          createdMatches.push(match.id)
-          matched.add(eligible[i].id)
-          matched.add(eligible[bestJ].id)
-          // Stop if pair limit reached
-          if (maxPairs !== undefined && createdMatches.length >= maxPairs) break
-        }
+          },
+        })
+        createdMatches.push(match.id)
+        matched.add(eligible[c.i].id)
+        matched.add(eligible[c.j].id)
+        if (maxPairs !== undefined && createdMatches.length >= maxPairs) break
       }
     }
 
@@ -308,10 +356,14 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < unmatchedForGroup.length; i++) {
         if (groupMatched.has(unmatchedForGroup[i].id)) continue
 
-        // Find all others that share a UTC overlap with participant i
+        // Candidates = others who (a) overlap availability with participant i
+        // AND (b) don't violate any MANDATORY rule against i. (b) is a cheap
+        // upfront filter; the full per-member MANDATORY check still runs inside
+        // tryGroup against every existing group member.
         const candidates: { p: ParticipantData; overlap: NonNullable<ReturnType<typeof findAvailabilityOverlap>> }[] = []
         for (let j = 0; j < unmatchedForGroup.length; j++) {
           if (j === i || groupMatched.has(unmatchedForGroup[j].id)) continue
+          if (!memberPassesMandatory(unmatchedForGroup[j], [unmatchedForGroup[i]], fieldDefs, differentSchoolRule, differentCountryRule)) continue
           const ov = findAvailabilityOverlap(
             unmatchedForGroup[i].availability, unmatchedForGroup[i].confirmedTz,
             unmatchedForGroup[j].availability, unmatchedForGroup[j].confirmedTz,
@@ -321,16 +373,27 @@ export async function POST(request: NextRequest) {
 
         if (candidates.length < size - 1) continue
 
-        // Try to extend: find a common overlap among i + first (size-1) candidates
-        // Pick the first viable combination
         let bestGroup: ParticipantData[] | null = null
+        let bestGroupScore = -1
         let bestOverlap: ReturnType<typeof findAvailabilityOverlap> = null
 
         const tryGroup = (members: ParticipantData[], currentOverlap: ReturnType<typeof findAvailabilityOverlap>) => {
-          if (members.length === size) { bestGroup = members; bestOverlap = currentOverlap; return }
+          if (members.length === size) {
+            // Score the complete group; keep the highest-scoring valid one.
+            const score = scoreGroup(members, fieldDefs, differentSchoolRule, differentCountryRule)
+            if (score > bestGroupScore) {
+              bestGroupScore = score
+              bestGroup = members
+              bestOverlap = currentOverlap
+            }
+            return
+          }
           for (const cand of candidates) {
             if (members.includes(cand.p)) continue
-            // Narrow current overlap against this candidate's UTC slots
+            // Enforce MANDATORY rules against every existing group member, not
+            // just the seed participant.
+            if (!memberPassesMandatory(cand.p, members, fieldDefs, differentSchoolRule, differentCountryRule)) continue
+
             const utcSlots = cand.p.availability.map((s) => {
               const u = slotToUtc(s, cand.p.confirmedTz)
               return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
@@ -340,27 +403,15 @@ export async function POST(request: NextRequest) {
               : findAvailabilityOverlap(cand.p.availability, cand.p.confirmedTz, members[0].availability, members[0].confirmedTz)
             if (newOverlap || availabilityRule !== 'mandatory') {
               tryGroup([...members, cand.p], newOverlap)
-              if (bestGroup) return
+              // Don't short-circuit: keep searching for higher-scoring groups.
             }
           }
         }
 
-        // Seed overlap: convert first participant's slots to UTC pseudo-slots
-        const seedUtcSlots = unmatchedForGroup[i].availability.map((s) => {
-          const u = slotToUtc(s, unmatchedForGroup[i].confirmedTz)
-          return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
-        })
-        // Find overlap between seed and first candidate to start with
-        let seedOverlap: ReturnType<typeof findAvailabilityOverlap> = null
-        if (candidates.length > 0) {
-          const firstCandUtc = candidates[0].p.availability.map((s) => {
-            const u = slotToUtc(s, candidates[0].p.confirmedTz)
-            return { dayOfWeek: u.dayOfWeek, startTime: minutesToTime(u.startMinutes), endTime: minutesToTime(u.endMinutes) }
-          })
-          seedOverlap = findAvailabilityOverlap(seedUtcSlots, 'UTC', firstCandUtc, 'UTC')
-        }
-
-        tryGroup([unmatchedForGroup[i]], seedOverlap)
+        // No seed overlap — let tryGroup build it naturally from the first
+        // candidate added. Previously this was tied to candidates[0], which
+        // narrowed the search even when the optimal group didn't include them.
+        tryGroup([unmatchedForGroup[i]], null)
 
         const resolvedGroup = bestGroup as ParticipantData[] | null
         const resolvedOverlap = bestOverlap as ReturnType<typeof findAvailabilityOverlap>

@@ -72,9 +72,12 @@ model Participant {
   email            String
   parentEmail      String?
   phone            String?
+  parentPhone      String?
   schoolName       String
   city             String
   country          String
+  countryOfBirth   String?
+  notes            String?
   detectedTz       String
   confirmedTz      String
   status           ParticipantStatus @default(PENDING)

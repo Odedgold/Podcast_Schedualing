@@ -12,8 +12,19 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   const provided = request.headers.get('x-admin-password')
-  if (!provided || provided !== process.env.ADMIN_PASSWORD) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const expected = process.env.ADMIN_PASSWORD
+  if (!provided || provided !== expected) {
+    return Response.json({
+      error: 'Unauthorized',
+      debug: {
+        providedLen: provided?.length ?? 0,
+        expectedLen: expected?.length ?? 0,
+        providedDefined: !!provided,
+        expectedDefined: !!expected,
+        providedSample: provided ? provided.slice(0, 1) + '***' : null,
+        expectedSample: expected ? expected.slice(0, 1) + '***' : null,
+      },
+    }, { status: 401 })
   }
   try {
     const stmts = [

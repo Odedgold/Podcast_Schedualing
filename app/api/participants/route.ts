@@ -10,16 +10,19 @@ export async function POST(request: NextRequest) {
       email,
       parentEmail,
       phone,
+      parentPhone,
       schoolName,
       city,
       country,
+      countryOfBirth,
       detectedTz,
       confirmedTz,
+      notes,
       availability,
       customFields,
     } = body
 
-    if (!fullName || !email || !parentEmail || !schoolName || !city || !country || !confirmedTz) {
+    if (!fullName || !email || !parentEmail || !phone || !parentPhone || !schoolName || !city || !country || !countryOfBirth || !confirmedTz) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -39,10 +42,13 @@ export async function POST(request: NextRequest) {
       fullName,
       email,
       parentEmail,
-      phone: phone || null,
+      phone,
+      parentPhone,
       schoolName,
       city,
       country,
+      countryOfBirth,
+      notes: notes?.trim() ? String(notes).trim() : null,
       detectedTz: detectedTz || confirmedTz,
       confirmedTz,
       programId,

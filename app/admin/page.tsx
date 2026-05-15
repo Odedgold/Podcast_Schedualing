@@ -32,10 +32,14 @@ interface Participant {
   id: string
   fullName: string
   email: string
-  phone?: string
+  parentEmail?: string | null
+  phone?: string | null
+  parentPhone?: string | null
   schoolName: string
   city: string
   country: string
+  countryOfBirth?: string | null
+  notes?: string | null
   confirmedTz: string
   status: ParticipantStatus
   submittedAt: string
@@ -204,14 +208,18 @@ export default function AdminDashboard() {
       const row: Record<string, string | number> = {
         Name: p.fullName,
         Email: p.email,
+        'Parent Email': p.parentEmail || '',
         Phone: p.phone || '',
+        'Parent Phone': p.parentPhone || '',
         School: p.schoolName,
         City: p.city,
         Country: p.country,
+        'Country of Birth': p.countryOfBirth || '',
         Timezone: p.confirmedTz,
         Status: p.status,
         'Available Slots': p.availability.length,
         Submitted: new Date(p.submittedAt).toLocaleString(),
+        Notes: p.notes || '',
       }
       for (const label of allFieldLabels) {
         row[label] = customFieldMap[label] ?? ''
@@ -652,8 +660,14 @@ export default function AdminDashboard() {
                     <thead>
                       <tr className="border-b border-gray-100 text-left">
                         <th className="px-4 py-3 font-medium text-gray-600">Name</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Email</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Parent Email</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Phone</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Parent Phone</th>
                         <th className="px-4 py-3 font-medium text-gray-600">School</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">City</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Country</th>
+                        <th className="px-4 py-3 font-medium text-gray-600">Born</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Status</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Slots</th>
                         <th className="px-4 py-3 font-medium text-gray-600">Submitted</th>
@@ -669,8 +683,14 @@ export default function AdminDashboard() {
                               {p.fullName || '(empty)'}
                             </button>
                           </td>
+                          <td className="px-4 py-3 text-gray-600 text-xs">{p.email}</td>
+                          <td className="px-4 py-3 text-gray-600 text-xs">{p.parentEmail || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{p.phone || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{p.parentPhone || '—'}</td>
                           <td className="px-4 py-3 text-gray-600">{p.schoolName}</td>
+                          <td className="px-4 py-3 text-gray-600">{p.city}</td>
                           <td className="px-4 py-3 text-gray-600">{p.country}</td>
+                          <td className="px-4 py-3 text-gray-600 text-xs">{p.countryOfBirth || '—'}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               p.status === 'MATCHED' ? 'bg-green-100 text-green-700' :
@@ -1696,13 +1716,17 @@ export default function AdminDashboard() {
                     {[
                       ['Full Name', detailParticipant.fullName],
                       ['Email', detailParticipant.email],
+                      ['Parent Email', detailParticipant.parentEmail || '—'],
                       ['Phone', detailParticipant.phone || '—'],
+                      ['Parent Phone', detailParticipant.parentPhone || '—'],
                       ['School', detailParticipant.schoolName],
                       ['City', detailParticipant.city],
-                      ['Country', detailParticipant.country],
+                      ['Country (residence)', detailParticipant.country],
+                      ['Country of Birth', detailParticipant.countryOfBirth || '—'],
                       ['Timezone', detailParticipant.confirmedTz],
                       ['Status', detailParticipant.status],
                       ['Availability Slots', String(detailParticipant.availability.length)],
+                      ['Notes', detailParticipant.notes || '—'],
                     ].map(([label, value]) => (
                       <tr key={label} className="hover:bg-gray-50">
                         <td className="px-4 py-2.5 font-medium text-gray-600 w-40">{label}</td>

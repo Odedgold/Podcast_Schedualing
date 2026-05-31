@@ -201,6 +201,15 @@ export default function AdminDashboard() {
       }
     }
 
+    // Format a participant's availability slots as a readable, parseable string.
+    // Example: "Sun 10:00-11:00 | Mon 14:00-15:00 | Tue 09:00-10:30"
+    // Day order: 0=Sun, 1=Mon, ..., 6=Sat (matches AvailabilitySlot.dayOfWeek).
+    const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const formatSlots = (slots: typeof participants[number]['availability']) =>
+      slots
+        .map((s) => `${DAY_SHORT[s.dayOfWeek] ?? `?${s.dayOfWeek}`} ${s.startTime}-${s.endTime}`)
+        .join(' | ')
+
     const data = participants.map((p) => {
       const customFieldMap = Object.fromEntries(
         (p.customFields || []).map((cf) => [parseFieldLabel(cf.field.label), cf.value])
@@ -218,6 +227,7 @@ export default function AdminDashboard() {
         Timezone: p.confirmedTz,
         Status: p.status,
         'Available Slots': p.availability.length,
+        'Available Times': formatSlots(p.availability),
         Submitted: new Date(p.submittedAt).toLocaleString(),
         Notes: p.notes || '',
       }
